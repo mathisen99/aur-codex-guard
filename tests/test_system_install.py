@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from aur_codex_guard import __version__
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = PROJECT_ROOT / "scripts" / "install-system.sh"
 UNINSTALLER = PROJECT_ROOT / "scripts" / "uninstall-system.sh"
@@ -24,6 +26,28 @@ class SystemInstallTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
+
+    def test_checkout_internal_launchers_import_outside_project_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            hook = subprocess.run(
+                [str(PROJECT_ROOT / "scripts/aur-codex-guard-hook"), "--help"],
+                cwd=temporary,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(hook.returncode, 0, hook.stderr)
+
+            makepkg = subprocess.run(
+                [str(PROJECT_ROOT / "scripts/aur-codex-guard-makepkg")],
+                cwd=temporary,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(makepkg.returncode, 3, makepkg.stderr)
+            self.assertIn("Missing trusted makepkg path", makepkg.stderr)
+            self.assertNotIn("ModuleNotFoundError", makepkg.stderr)
 
     def test_staged_install_provides_working_plain_yay_shim(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -44,7 +68,7 @@ class SystemInstallTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(version.returncode, 0, version.stderr)
-            self.assertIn("0.5.0", version.stdout)
+            self.assertIn(__version__, version.stdout)
 
             self.assertIn(
                 "dispatch-yay",

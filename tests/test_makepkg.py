@@ -39,6 +39,60 @@ class PackageInspectionTests(unittest.TestCase):
         with self.assertRaises(MakepkgGuardError):
             _validate_archive_paths(Path("bad.pkg.tar.zst"), ["usr/bin/tool"], listing)
 
+    def test_accepts_preexisting_setuid_entry_during_update(self) -> None:
+        listing = ["-rwsr-xr-x root/root 1 Jan 1 00:00 opt/tool/sandbox"]
+        with patch("aur_codex_guard.makepkg._privileged_mode_is_preexisting", return_value=True):
+            _validate_archive_paths(Path("update.pkg.tar.zst"), ["opt/tool/sandbox"], listing)
+
+    def test_symlink_modes_are_not_treated_as_world_writable(self) -> None:
+        _validate_archive_paths(
+            Path("safe.pkg.tar.zst"),
+            ["usr/bin/tool"],
+            ["lrwxrwxrwx root/root 0 Jan 1 00:00 usr/bin/tool -> /usr/lib/tool/tool"],
+        )
+
+    def test_accepts_safe_parent_segments_in_relative_symlink(self) -> None:
+        _validate_archive_paths(
+            Path("safe.pkg.tar.zst"),
+            ["usr/lib/debug/.build-id/aa/tool"],
+            [
+                (
+                    "lrwxrwxrwx root/root 0 Jan 1 00:00 "
+                    "usr/lib/debug/.build-id/aa/tool -> ../../../../bin/tool"
+                )
+            ],
+        )
+
+    def test_rejects_escaping_or_parent_symlink_entries(self) -> None:
+        with self.assertRaisesRegex(MakepkgGuardError, "Unsafe symlink target"):
+            _validate_archive_paths(
+                Path("bad.pkg.tar.zst"),
+                ["usr/bin/tool"],
+                ["lrwxrwxrwx root/root 0 Jan 1 00:00 usr/bin/tool -> ../../../etc/passwd"],
+            )
+        with self.assertRaisesRegex(MakepkgGuardError, "nested beneath a symlink"):
+            _validate_archive_paths(
+                Path("bad.pkg.tar.zst"),
+                ["usr/lib/tool", "usr/lib/tool/payload"],
+                [
+                    "lrwxrwxrwx root/root 0 Jan 1 00:00 usr/lib/tool -> /opt/tool",
+                    "-rw-r--r-- root/root 1 Jan 1 00:00 usr/lib/tool/payload",
+                ],
+            )
+
+    def test_rejects_world_writable_regular_file_but_accepts_sticky_directory(self) -> None:
+        with self.assertRaisesRegex(MakepkgGuardError, "World-writable"):
+            _validate_archive_paths(
+                Path("bad.pkg.tar.zst"),
+                ["usr/share/tool/data"],
+                ["-rw-rw-rw- root/root 1 Jan 1 00:00 usr/share/tool/data"],
+            )
+        _validate_archive_paths(
+            Path("safe.pkg.tar.zst"),
+            ["var/lib/tool/tmp"],
+            ["drwxrwxrwt root/root 0 Jan 1 00:00 var/lib/tool/tmp/"],
+        )
+
     def test_rejects_duplicate_and_special_archive_entries(self) -> None:
         with self.assertRaises(MakepkgGuardError):
             _validate_archive_paths(Path("bad.pkg.tar.zst"), ["./etc/file", "etc/file"], [])

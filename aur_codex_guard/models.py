@@ -5,6 +5,7 @@ from typing import Literal, cast
 
 Severity = Literal["info", "low", "medium", "high", "critical"]
 Verdict = Literal["allow", "warn", "block"]
+Confidence = Literal["low", "medium", "high"]
 
 SEVERITY_RANK: dict[str, int] = {
     "info": 0,
@@ -88,7 +89,7 @@ class DeterministicReport:
 @dataclass
 class CodexReport:
     verdict: Verdict
-    confidence: Literal["low", "medium", "high"]
+    confidence: Confidence
     summary: str
     findings: list[dict[str, object]]
     reviewed_files: list[str]
@@ -120,8 +121,8 @@ class CodexReport:
         ):
             raise TypeError("Codex response has invalid limitations")
         return cls(
-            verdict=verdict,  # type: ignore[arg-type]
-            confidence=confidence,  # type: ignore[arg-type]
+            verdict=cast(Verdict, verdict),
+            confidence=cast(Confidence, confidence),
             summary=str(value.get("summary", "")),
             findings=cast(list[dict[str, object]], findings),
             reviewed_files=cast(list[str], reviewed_files),

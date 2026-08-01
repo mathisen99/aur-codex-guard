@@ -128,7 +128,8 @@ def _validate_archive_paths(archive: Path, entries: list[str], verbose: list[str
         if normalized in normalized_entries:
             raise MakepkgGuardError(f"Duplicate path in package archive {archive}: {name!r}")
         normalized_entries.add(normalized)
-    for line in verbose:
+    symlink_paths: set[str] = set()
+    for name, line in zip(entries, verbose, strict=True):
         mode = line.split(maxsplit=1)[0] if line else ""
         if len(mode) < 10:
             raise MakepkgGuardError(f"Malformed verbose archive listing: {archive}")
@@ -136,23 +137,74 @@ def _validate_archive_paths(archive: Path, entries: list[str], verbose: list[str
             raise MakepkgGuardError(
                 f"Special file or hardlink in package archive {archive}: {mode[0]}"
             )
-        if mode[3] in "sS" or mode[6] in "sS":
-            raise MakepkgGuardError(f"Setuid/setgid entry in package archive {archive}")
-        if mode[8] == "w" and mode[9] not in "tT":
-            raise MakepkgGuardError(f"World-writable entry in package archive {archive}")
-        if " -> " in line:
-            target = line.rsplit(" -> ", 1)[1]
-            target_path = PurePosixPath(target)
-            if target.startswith("/") or ".." in target_path.parts:
+        normalized = _normalize_archive_path(name)
+        if mode[0] == "l":
+            symlink_paths.add(normalized)
+            marker = f" {name} -> "
+            if marker not in line:
+                raise MakepkgGuardError(f"Malformed symlink listing in package archive {archive}")
+            target = line.split(marker, 1)[1]
+            if _resolve_archive_link(normalized, target) is None:
                 raise MakepkgGuardError(
                     f"Unsafe symlink target in package archive {archive}: {target!r}"
                 )
-        if " link to " in line:
-            raise MakepkgGuardError(f"Hardlink in package archive {archive}")
+            # Symlink permission bits are ignored by Linux.  bsdtar normally
+            # displays every symlink as lrwxrwxrwx, so applying regular-file
+            # permission policy here rejects virtually every real package.
+            continue
+        if (
+            (mode[3] in "sS" or mode[6] in "sS")
+            and mode[0] == "-"
+            and not _privileged_mode_is_preexisting(normalized, mode)
+        ):
+            raise MakepkgGuardError(
+                f"New setuid/setgid entry in package archive {archive}: {normalized}"
+            )
+        if mode[8] == "w" and mode[9] not in "tT":
+            raise MakepkgGuardError(f"World-writable entry in package archive {archive}")
+    for normalized in normalized_entries:
+        parts = PurePosixPath(normalized).parts
+        parents = (PurePosixPath(*parts[:index]).as_posix() for index in range(1, len(parts)))
+        if any(parent in symlink_paths for parent in parents):
+            raise MakepkgGuardError(
+                f"Archive entry is nested beneath a symlink in {archive}: {normalized}"
+            )
 
 
 def _normalize_archive_path(name: str) -> str:
     return PurePosixPath(name).as_posix().rstrip("/")
+
+
+def _resolve_archive_link(name: str, target: str) -> str | None:
+    if not target or any(ord(character) < 32 for character in target):
+        return None
+    resolved = [] if target.startswith("/") else list(PurePosixPath(name).parent.parts)
+    for part in PurePosixPath(target).parts:
+        if part in {"/", "."}:
+            continue
+        if part == "..":
+            if not resolved:
+                return None
+            resolved.pop()
+            continue
+        resolved.append(part)
+    return PurePosixPath(*resolved).as_posix() if resolved else "."
+
+
+def _privileged_mode_is_preexisting(name: str, mode: str) -> bool:
+    """Return true when an update preserves, rather than introduces, privilege."""
+    try:
+        installed = (Path("/") / name).lstat()
+    except OSError:
+        return False
+    if not stat.S_ISREG(installed.st_mode):
+        return False
+    required = 0
+    if mode[3] in "sS":
+        required |= stat.S_ISUID
+    if mode[6] in "sS":
+        required |= stat.S_ISGID
+    return required != 0 and installed.st_mode & required == required
 
 
 def _is_control_path(name: str) -> bool:

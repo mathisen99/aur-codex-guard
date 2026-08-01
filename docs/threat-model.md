@@ -52,7 +52,7 @@ Compromise of a trusted component is out of scope.
 - Reviewed path content or mode changes before or during build
 - Audit event cannot be durably written for an allowed review
 - Unexpected makepkg argument/configuration, package destination escape, or cached artifact outside the private transaction
-- Built archive inspection fails or finds a forbidden path, link, file type, permission, or package-control behavior
+- Built archive inspection fails or finds a forbidden path, escaping or parent-shadowing link, file type, unsafe permission, newly introduced privileged executable, or package-control behavior
 
 ## Explicit non-goals and residual risk
 
