@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "aur-codex-guard"
-version = "0.2.0"
+version = "0.3.0"
 description = "Fail-closed pre-build security gate for yay and AUR packages"
 readme = "README.md"
 requires-python = ">=3.11"

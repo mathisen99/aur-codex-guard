@@ -8,12 +8,38 @@ import tempfile
 import time
 from pathlib import Path
 
+from .executables import ExecutableTrustError, resolve_trusted_executable
 from .models import CodexReport, DeterministicReport
 from .receipts import INTERNAL_ENV_PREFIX
 
 DEFAULT_TIMEOUT_SECONDS = 240
 REQUIRED_MODEL = "gpt-5.6-sol"
 REQUIRED_REASONING_EFFORT = "high"
+TESTED_CODEX_VERSION = "0.145.0"
+DISABLED_CODEX_FEATURES = (
+    "apps",
+    "auth_elicitation",
+    "browser_use",
+    "browser_use_external",
+    "browser_use_full_cdp_access",
+    "code_mode_host",
+    "computer_use",
+    "goals",
+    "guardian_approval",
+    "hooks",
+    "image_generation",
+    "in_app_browser",
+    "multi_agent",
+    "personality",
+    "plugins",
+    "remote_plugin",
+    "shell_snapshot",
+    "shell_tool",
+    "skill_search",
+    "tool_suggest",
+    "unified_exec",
+    "workspace_dependencies",
+)
 
 REVIEW_PROMPT = """You are a security reviewer evaluating Arch Linux AUR build metadata before any build or installation occurs.
 
@@ -29,6 +55,28 @@ Use `allow` only when you found no suspicious behavior, coverage is complete, co
 
 class CodexReviewError(RuntimeError):
     pass
+
+
+def validate_codex_support(candidate: str) -> str:
+    try:
+        resolved = resolve_trusted_executable(candidate, "codex")
+    except ExecutableTrustError as error:
+        raise CodexReviewError(str(error)) from error
+    try:
+        version = subprocess.run(
+            [resolved, "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise CodexReviewError(f"Could not inspect codex version: {error}") from error
+    if version.returncode != 0 or version.stdout.strip() != f"codex-cli {TESTED_CODEX_VERSION}":
+        raise CodexReviewError(
+            f"Unsupported codex CLI version; this release is pinned to {TESTED_CODEX_VERSION}"
+        )
+    return resolved
 
 
 def _schema_path() -> Path:
@@ -116,14 +164,15 @@ def _review_once(
             "--sandbox",
             "read-only",
             "--skip-git-repo-check",
-            "--disable",
-            "apps",
-            "--disable",
-            "hooks",
+            *[value for feature in DISABLED_CODEX_FEATURES for value in ("--disable", feature)],
             "-c",
             f'model_reasoning_effort="{REQUIRED_REASONING_EFFORT}"',
             "-c",
             'web_search="disabled"',
+            "-c",
+            'approval_policy="never"',
+            "-c",
+            "project_doc_max_bytes=0",
             "-c",
             'shell_environment_policy.inherit="none"',
             "--output-schema",
@@ -203,6 +252,7 @@ def review_with_codex(
     codex_binary: str = "codex",
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> CodexReport:
+    codex_binary = validate_codex_support(codex_binary)
     deadline = time.monotonic() + timeout_seconds
     reviews: list[CodexReport] = []
     for batch in _package_reports(report):

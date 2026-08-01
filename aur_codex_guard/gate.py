@@ -84,6 +84,13 @@ def review_packages(
             deterministic,
             codex,
         )
+    if codex.findings:
+        return GateReport(
+            "block",
+            "Codex returned findings alongside allow, so the inconsistent response failed closed.",
+            deterministic,
+            codex,
+        )
     return GateReport(
         "allow",
         "Deterministic checks and Codex review both allowed the package metadata.",

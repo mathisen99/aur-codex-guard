@@ -10,13 +10,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from re import Pattern
 
+from .executables import ExecutableTrustError, resolve_trusted_executable
 from .models import DeterministicReport, Finding, ReviewedFile, Severity
 
 MAX_FILE_BYTES = 512 * 1024
 MAX_PACKAGE_BYTES = 2 * 1024 * 1024
 MAX_DIFF_BYTES = 512 * 1024
 
-IGNORED_DIRECTORIES = {".git", "pkg", "src", "__pycache__"}
+IGNORED_DIRECTORIES = {".git"}
 
 
 @dataclass(frozen=True)
@@ -181,11 +182,35 @@ def _display_package(root: Path) -> str:
 
 
 def _git_diff(root: Path) -> str:
+    try:
+        git = resolve_trusted_executable("git", "git")
+    except ExecutableTrustError:
+        return ""
     env = os.environ.copy()
     env["GIT_CONFIG_NOSYSTEM"] = "1"
     env["GIT_CONFIG_GLOBAL"] = os.devnull
+    try:
+        top_level = subprocess.run(
+            [git, "-C", str(root), "rev-parse", "--show-toplevel"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if top_level.returncode != 0:
+        return ""
+    try:
+        if Path(top_level.stdout.strip()).resolve(strict=True) != root.resolve(strict=True):
+            return ""
+    except OSError:
+        return ""
     command = [
-        "git",
+        git,
         "-C",
         str(root),
         "--no-pager",

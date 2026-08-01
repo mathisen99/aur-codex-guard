@@ -66,6 +66,15 @@ class GateTests(unittest.TestCase):
         self.assertEqual(report.verdict, "block")
 
     @patch("aur_codex_guard.gate.review_with_codex")
+    def test_allow_with_any_finding_closes_gate(self, review_mock) -> None:
+        response = codex_report()
+        response.findings = [{"severity": "critical", "title": "inconsistent"}]
+        review_mock.return_value = response
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+        self.assertIn("inconsistent", report.reason)
+
+    @patch("aur_codex_guard.gate.review_with_codex")
     def test_codex_failure_closes_gate(self, review_mock) -> None:
         review_mock.side_effect = CodexReviewError("offline")
         report = review_packages([FIXTURES / "benign"])

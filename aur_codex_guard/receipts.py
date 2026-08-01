@@ -13,6 +13,8 @@ from .models import DeterministicReport, ReviewedFile
 SESSION_KEY_ENV = "AUR_CODEX_GUARD_SESSION_KEY"
 RECEIPT_DIR_ENV = "AUR_CODEX_GUARD_RECEIPT_DIR"
 REAL_MAKEPKG_ENV = "AUR_CODEX_GUARD_REAL_MAKEPKG"
+MAKEPKG_CONFIG_ENV = "AUR_CODEX_GUARD_MAKEPKG_CONFIG"
+PKGDEST_ENV = "AUR_CODEX_GUARD_PKGDEST"
 ACTIVE_ENV = "AUR_CODEX_GUARD_ACTIVE"
 INTERNAL_ENV_PREFIX = "AUR_CODEX_GUARD_"
 
@@ -73,8 +75,10 @@ def write_receipts(
         root = Path(root_text).resolve(strict=True)
         files = [item for item in report.reviewed_files if item.package_root == str(root)]
         payload = {
-            "version": 1,
+            "version": 2,
             "root": str(root),
+            "root_device": root.stat().st_dev,
+            "root_inode": root.stat().st_ino,
             "files": sorted((_file_record(item) for item in files), key=lambda x: str(x["path"])),
         }
         document = {
@@ -97,17 +101,37 @@ def write_receipts(
             raise
 
 
-def _hash_regular_file(path: Path, expected_mode: int) -> str:
+def _hash_regular_file_at(root_descriptor: int, relative: Path, expected_mode: int) -> str:
+    parts = relative.parts
+    if not parts:
+        raise ReceiptError("Approval receipt contains an empty path")
+    directory_descriptor = os.dup(root_descriptor)
     try:
-        descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        for part in parts[:-1]:
+            next_descriptor = os.open(
+                part,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_DIRECTORY,
+                dir_fd=directory_descriptor,
+            )
+            os.close(directory_descriptor)
+            directory_descriptor = next_descriptor
+        descriptor = os.open(
+            parts[-1],
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=directory_descriptor,
+        )
     except OSError as error:
-        raise ReceiptError(f"Reviewed file cannot be reopened: {path}: {error}") from error
+        raise ReceiptError(
+            f"Reviewed file cannot be reopened safely: {relative}: {error}"
+        ) from error
+    finally:
+        os.close(directory_descriptor)
     try:
         metadata = os.fstat(descriptor)
         if not stat.S_ISREG(metadata.st_mode):
-            raise ReceiptError(f"Reviewed path is no longer a regular file: {path}")
+            raise ReceiptError(f"Reviewed path is no longer a regular file: {relative}")
         if stat.S_IMODE(metadata.st_mode) != expected_mode:
-            raise ReceiptError(f"Reviewed file mode changed after approval: {path}")
+            raise ReceiptError(f"Reviewed file mode changed after approval: {relative}")
         digest = hashlib.sha256()
         while chunk := os.read(descriptor, 128 * 1024):
             digest.update(chunk)
@@ -117,7 +141,7 @@ def _hash_regular_file(path: Path, expected_mode: int) -> str:
             or finished.st_mtime_ns != metadata.st_mtime_ns
             or finished.st_ctime_ns != metadata.st_ctime_ns
         ):
-            raise ReceiptError(f"Reviewed file changed while being verified: {path}")
+            raise ReceiptError(f"Reviewed file changed while being verified: {relative}")
         return digest.hexdigest()
     finally:
         os.close(descriptor)
@@ -141,33 +165,53 @@ def verify_receipt(
     expected_signature = hmac.new(key, _canonical(payload), hashlib.sha256).hexdigest()
     if not isinstance(signature, str) or not hmac.compare_digest(signature, expected_signature):
         raise ReceiptError(f"Approval receipt authentication failed for {resolved_root}")
-    if payload.get("version") != 1 or payload.get("root") != str(resolved_root):
+    if payload.get("version") != 2 or payload.get("root") != str(resolved_root):
         raise ReceiptError(f"Approval receipt does not match {resolved_root}")
+    try:
+        root_descriptor = os.open(
+            resolved_root,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_DIRECTORY,
+        )
+    except OSError as error:
+        raise ReceiptError(f"Reviewed package root cannot be reopened safely: {error}") from error
+    root_metadata = os.fstat(root_descriptor)
+    if (
+        payload.get("root_device") != root_metadata.st_dev
+        or payload.get("root_inode") != root_metadata.st_ino
+    ):
+        os.close(root_descriptor)
+        raise ReceiptError(f"Reviewed package root identity changed: {resolved_root}")
     files = payload.get("files")
     if not isinstance(files, list) or not files:
+        os.close(root_descriptor)
         raise ReceiptError(f"Approval receipt has no reviewed files for {resolved_root}")
-    for value in files:
-        if not isinstance(value, dict):
-            raise ReceiptError("Approval receipt contains an invalid file record")
-        relative = value.get("path")
-        expected_hash = value.get("sha256")
-        expected_mode = value.get("mode")
-        if (
-            not isinstance(relative, str)
-            or not isinstance(expected_hash, str)
-            or not isinstance(expected_mode, int)
-        ):
-            raise ReceiptError("Approval receipt contains an invalid file record")
-        relative_path = Path(relative)
-        if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise ReceiptError("Approval receipt contains an escaping path")
-        candidate = resolved_root / relative_path
-        try:
-            candidate.relative_to(resolved_root)
-        except ValueError as error:
-            raise ReceiptError("Approval receipt contains an escaping path") from error
-        if _hash_regular_file(candidate, expected_mode) != expected_hash:
-            raise ReceiptError(f"Reviewed file changed after approval: {candidate}")
+    try:
+        seen: set[str] = set()
+        for value in files:
+            if not isinstance(value, dict):
+                raise ReceiptError("Approval receipt contains an invalid file record")
+            relative = value.get("path")
+            expected_hash = value.get("sha256")
+            expected_mode = value.get("mode")
+            if (
+                not isinstance(relative, str)
+                or not isinstance(expected_hash, str)
+                or not isinstance(expected_mode, int)
+            ):
+                raise ReceiptError("Approval receipt contains an invalid file record")
+            relative_path = Path(relative)
+            if relative_path.is_absolute() or ".." in relative_path.parts or relative in seen:
+                raise ReceiptError("Approval receipt contains an escaping or duplicate path")
+            seen.add(relative)
+            if (
+                _hash_regular_file_at(root_descriptor, relative_path, expected_mode)
+                != expected_hash
+            ):
+                raise ReceiptError(
+                    f"Reviewed file changed after approval: {resolved_root / relative_path}"
+                )
+    finally:
+        os.close(root_descriptor)
 
 
 def sanitized_child_environment(
