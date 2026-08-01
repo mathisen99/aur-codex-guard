@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aur-codex-guard"
+version = "0.1.0"
+description = "Fail-closed pre-build security gate for yay and AUR packages"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Tommy Mathisen" }]
+keywords = ["arch-linux", "aur", "pkgbuild", "security", "codex"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+]
+
+[project.scripts]
+aur-codex-guard = "aur_codex_guard.cli:main"
+aur-codex-guard-hook = "aur_codex_guard.cli:hook_main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aur_codex_guard"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"aur_codex_guard/schemas/review.schema.json" = "aur_codex_guard/schemas/review.schema.json"

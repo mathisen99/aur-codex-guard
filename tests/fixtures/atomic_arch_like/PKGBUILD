@@ -1,0 +1,12 @@
+# Deliberately malicious-looking test fixture. Never execute this file.
+pkgname=aur-codex-guard-malicious-fixture
+pkgver=1.0.0
+pkgrel=2
+arch=('x86_64')
+install=malicious.install
+source=('payload.sh')
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 payload.sh "$pkgdir/usr/lib/guard-fixture/payload.sh"
+}

@@ -1,0 +1,14 @@
+# Maintainer: Example Maintainer <maintainer@example.invalid>
+pkgname=aur-codex-guard-benign-fixture
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Benign fixture for scanner tests'
+arch=('any')
+url='https://example.invalid/benign'
+license=('MIT')
+source=('hello.sh')
+sha256sums=('ca2c656e8bcf319a66543a5913efeb09538f4ddcc1f8575b91e061ceeb0b5414')
+
+package() {
+  install -Dm755 hello.sh "$pkgdir/usr/bin/hello-guard-fixture"
+}
