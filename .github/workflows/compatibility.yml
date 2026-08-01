@@ -32,6 +32,7 @@ jobs:
           pacman -U --noconfirm /tmp/yay/yay-*.pkg.tar.zst
       - name: Check rolling compatibility without model credentials
         run: |
+          chown -R builder:builder "$GITHUB_WORKSPACE"
           runuser -u builder -- sh -c '
             cd "$1"
             ./aur-codex-guard doctor --json
