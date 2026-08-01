@@ -33,6 +33,7 @@ jobs:
       - name: Check rolling compatibility without model credentials
         run: |
           chown -R builder:builder "$GITHUB_WORKSPACE"
+          chmod -R go-w "$GITHUB_WORKSPACE"
           runuser -u builder -- sh -c '
             cd "$1"
             ./aur-codex-guard doctor --json
