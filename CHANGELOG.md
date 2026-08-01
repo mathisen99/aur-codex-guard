@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1 - 2026-08-01
+
+- Fixed built-package inspection falsely treating the conventional `lrwxrwxrwx` display mode of symlinks as a world-writable file.
+- Accepted absolute package symlinks and relative parent segments only when their lexical target remains inside the installed filesystem tree, while rejecting archive entries nested beneath a symlink.
+- Allowed an update to preserve setuid/setgid bits already present on the same installed regular-file path; packages that introduce a new privileged executable remain blocked.
+- Added regression coverage and validated the corrected inspector against cached archives for Chrome, VS Code, Zen Browser, Pi, and both normal and debug FVS2 packages.
+- Completed a real guarded FVS2 update from metadata download through Codex review, build, archive inspection, and successful Pacman installation.
+- Simplified the README, added project artwork and a real terminal screenshot, made the package version single-source, and tightened CI and maintainer guidance.
+- Fixed the checkout-only makepkg launcher so it imports reliably when yay invokes it from an external build directory.
+- Ran rolling compatibility checks from a private-mode, builder-owned checkout so yay's root warning cannot mask its version output while scanner ownership checks retain their real-user semantics.
+
 ## 0.5.0 - 2026-08-01
 
 - Added an explicit root-owned `/usr/local` installer that leaves `/usr/bin/yay` package-managed and places a transparent `yay` dispatcher earlier in normal system `PATH` resolution.

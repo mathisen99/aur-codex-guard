@@ -6,16 +6,16 @@ from unittest.mock import patch
 
 from aur_codex_guard.codex_review import CodexReviewError, build_review_input
 from aur_codex_guard.gate import review_packages
-from aur_codex_guard.models import CodexReport
+from aur_codex_guard.models import CodexReport, Confidence, Verdict
 from aur_codex_guard.scanner import deterministic_scan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def codex_report(verdict: str = "allow", confidence: str = "high") -> CodexReport:
+def codex_report(verdict: Verdict = "allow", confidence: Confidence = "high") -> CodexReport:
     return CodexReport(
-        verdict=verdict,  # type: ignore[arg-type]
-        confidence=confidence,  # type: ignore[arg-type]
+        verdict=verdict,
+        confidence=confidence,
         summary="fixture response",
         findings=[],
         reviewed_files=["benign/PKGBUILD", "benign/hello.sh"],

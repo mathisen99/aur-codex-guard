@@ -8,9 +8,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: rolling-compatibility
+  cancel-in-progress: true
+
 jobs:
   arch-latest:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: archlinux:latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,6 +32,11 @@ jobs:
           pacman -U --noconfirm /tmp/yay/yay-*.pkg.tar.zst
       - name: Check rolling compatibility without model credentials
         run: |
-          ./aur-codex-guard doctor --json
-          python scripts/run_policy_evals.py
-          python -m unittest discover -s tests -v
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          chmod -R go-w "$GITHUB_WORKSPACE"
+          runuser -u builder -- sh -c '
+            cd "$1"
+            ./aur-codex-guard doctor --json
+            python scripts/run_policy_evals.py
+            python -m unittest discover -s tests -v
+          ' sh "$GITHUB_WORKSPACE"
