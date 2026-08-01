@@ -20,7 +20,7 @@ if [ -z "$destination" ] && [ "$(id -u)" -ne 0 ]; then
   echo "error: system installation requires root; run sudo ./scripts/install-system.sh" >&2
   exit 2
 fi
-if [ ! -x /usr/bin/yay ]; then
+if [ -z "$destination" ] && [ ! -x /usr/bin/yay ]; then
   echo "error: expected the real yay executable at /usr/bin/yay" >&2
   exit 2
 fi

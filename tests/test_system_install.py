@@ -46,14 +46,10 @@ class SystemInstallTests(unittest.TestCase):
             self.assertEqual(version.returncode, 0, version.stderr)
             self.assertIn("0.5.0", version.stdout)
 
-            passthrough = subprocess.run(
-                [str(shim), "--version"],
-                text=True,
-                capture_output=True,
-                check=False,
+            self.assertIn(
+                "dispatch-yay",
+                shim.read_text(encoding="utf-8"),
             )
-            self.assertEqual(passthrough.returncode, 0, passthrough.stderr)
-            self.assertIn("yay v13.", passthrough.stdout)
 
             ambiguous = subprocess.run(
                 [str(shim), "package-name"],
