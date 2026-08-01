@@ -1,0 +1,25 @@
+pkgname=policy-python-pep517
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for a conventional Python PEP 517 build'
+arch=('any')
+url='https://example.invalid/python-pep517'
+license=('MIT')
+makedepends=('python-build' 'python-installer' 'python-pytest')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('4444444444444444444444444444444444444444444444444444444444444444')
+
+build() {
+  cd "$pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  python -m pytest
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+}

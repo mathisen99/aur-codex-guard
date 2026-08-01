@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import re
 import secrets
 import shlex
 import stat
@@ -10,6 +11,8 @@ import tempfile
 from pathlib import Path
 
 from .audit import AuditError, write_transaction_event
+from .codex_review import CodexReviewError, ensure_codex_canary
+from .compatibility import CompatibilityError, inspect_bsdtar_support, inspect_makepkg_support
 from .executables import ExecutableTrustError, resolve_trusted_executable
 from .receipts import (
     ACTIVE_ENV,
@@ -19,8 +22,10 @@ from .receipts import (
     RECEIPT_DIR_ENV,
     SESSION_KEY_ENV,
 )
+from .reporting import print_canary_start
 
-TESTED_YAY_VERSION = "13.0.1"
+MINIMUM_YAY_VERSION = (13, 0, 1)
+MAXIMUM_YAY_VERSION = (14, 0, 0)
 SYSTEM_MAKEPKG_CONFIG = Path("/etc/makepkg.conf")
 
 PROTECTED_YAY_OPTIONS = {
@@ -126,13 +131,16 @@ def validate_yay_support(yay_binary: str) -> None:
     except (OSError, subprocess.TimeoutExpired) as error:
         raise YayIntegrationError(f"Could not inspect yay version: {error}") from error
     first_line = version.stdout.splitlines()[:1]
-    if (
-        version.returncode != 0
-        or not first_line
-        or not first_line[0].startswith(f"yay v{TESTED_YAY_VERSION} ")
-    ):
+    match = re.match(r"^yay v(\d+)\.(\d+)\.(\d+)(?:\s|$)", first_line[0]) if first_line else None
+    if version.returncode != 0 or not match:
+        raise YayIntegrationError("Could not parse installed yay version")
+    parsed = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    if parsed < MINIMUM_YAY_VERSION or parsed >= MAXIMUM_YAY_VERSION:
+        minimum = ".".join(str(part) for part in MINIMUM_YAY_VERSION)
+        maximum = ".".join(str(part) for part in MAXIMUM_YAY_VERSION)
         raise YayIntegrationError(
-            f"Unsupported yay version; this release is pinned to yay {TESTED_YAY_VERSION}"
+            f"Unsupported yay version {'.'.join(str(part) for part in parsed)}; "
+            f"required range is >= {minimum}, < {maximum}"
         )
     try:
         result = subprocess.run(
@@ -322,8 +330,19 @@ def run_guarded_yay(arguments: list[str], *, yay_binary: str | None = None) -> i
     hook = hook_executable()
     makepkg_wrapper = makepkg_executable()
     real_makepkg = find_real_makepkg()
+    try:
+        inspect_makepkg_support(real_makepkg)
+        inspect_bsdtar_support()
+    except CompatibilityError as error:
+        raise YayIntegrationError(str(error)) from error
     lock_descriptor = _lock_file()
     try:
+        try:
+            ensure_codex_canary(
+                on_live_start=lambda support: print_canary_start(support.version_text)
+            )
+        except CodexReviewError as error:
+            raise YayIntegrationError(f"Codex compatibility preflight failed: {error}") from error
         with tempfile.TemporaryDirectory(prefix="aur-codex-guard-session-") as session:
             session_path = Path(session)
             os.chmod(session_path, 0o700)

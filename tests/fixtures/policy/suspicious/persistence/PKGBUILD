@@ -1,0 +1,14 @@
+pkgname=policy-persistence
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture that crosses the persistence boundary'
+arch=('any')
+url='https://example.invalid/persistence'
+license=('MIT')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+
+package() {
+  mkdir -p "$HOME/.config/autostart"
+  install -Dm644 payload.desktop "$HOME/.config/autostart/payload.desktop"
+}

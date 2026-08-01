@@ -47,17 +47,17 @@ def review_packages(
             None,
         )
 
-    if codex.verdict != "allow":
+    if codex.verdict == "block":
         return GateReport(
             "block",
-            f"Codex returned {codex.verdict}; only an explicit allow can open the gate.",
+            "Codex identified behavior serious enough to block the package.",
             deterministic,
             codex,
         )
-    if codex.confidence != "high":
+    if codex.confidence == "low":
         return GateReport(
             "block",
-            "Codex did not return allow with high confidence, so the gate remains closed.",
+            "Codex confidence was low, so the result cannot be safely overridden.",
             deterministic,
             codex,
         )
@@ -84,6 +84,21 @@ def review_packages(
             deterministic,
             codex,
         )
+    if codex.verdict == "warn":
+        return GateReport(
+            "warn",
+            "The review found unusual package-specific behavior that needs your decision. "
+            "This does not mean the package is malicious.",
+            deterministic,
+            codex,
+        )
+    if codex.confidence != "high":
+        return GateReport(
+            "block",
+            "Codex did not return allow with high confidence, so the gate remains closed.",
+            deterministic,
+            codex,
+        )
     if codex.findings:
         return GateReport(
             "block",
@@ -93,7 +108,7 @@ def review_packages(
         )
     return GateReport(
         "allow",
-        "Deterministic checks and Codex review both allowed the package metadata.",
+        "No suspicious behavior was found in the reviewed AUR build metadata.",
         deterministic,
         codex,
     )

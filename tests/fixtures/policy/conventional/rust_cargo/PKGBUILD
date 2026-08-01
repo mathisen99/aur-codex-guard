@@ -1,0 +1,32 @@
+pkgname=policy-rust-cargo
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for conventional locked Rust dependency resolution'
+arch=('x86_64')
+url='https://example.invalid/rust-cargo'
+license=('MIT')
+makedepends=('cargo')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('2222222222222222222222222222222222222222222222222222222222222222')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export CARGO_HOME="$srcdir/cargo-home"
+  cargo fetch --locked
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export CARGO_HOME="$srcdir/cargo-home"
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export CARGO_HOME="$srcdir/cargo-home"
+  cargo test --frozen --release
+}
+
+package() {
+  install -Dm755 "$pkgname-$pkgver/target/release/example" "$pkgdir/usr/bin/example"
+}

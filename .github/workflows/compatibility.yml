@@ -1,0 +1,32 @@
+name: Rolling compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  arch-latest:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install current Arch build tools and Codex
+        run: |
+          pacman -Syu --noconfirm base-devel git go libarchive npm python
+          npm install --global @openai/codex
+      - name: Build current yay as an unprivileged user
+        run: |
+          useradd --create-home builder
+          git clone https://aur.archlinux.org/yay.git /tmp/yay
+          chown -R builder:builder /tmp/yay
+          runuser -u builder -- sh -lc 'cd /tmp/yay && makepkg --noconfirm'
+          pacman -U --noconfirm /tmp/yay/yay-*.pkg.tar.zst
+      - name: Check rolling compatibility without model credentials
+        run: |
+          ./aur-codex-guard doctor --json
+          python scripts/run_policy_evals.py
+          python -m unittest discover -s tests -v

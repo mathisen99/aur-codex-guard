@@ -1,0 +1,32 @@
+pkgname=policy-haskell-cabal
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for a conventional Haskell dependency and test build'
+arch=('x86_64')
+url='https://example.invalid/haskell-cabal'
+license=('BSD-3-Clause')
+makedepends=('cabal-install' 'ghc')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('7777777777777777777777777777777777777777777777777777777777777777')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export CABAL_DIR="$srcdir/cabal-home"
+  cabal update
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export CABAL_DIR="$srcdir/cabal-home"
+  cabal build --offline
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export CABAL_DIR="$srcdir/cabal-home"
+  cabal test --offline
+}
+
+package() {
+  install -Dm755 "$pkgname-$pkgver/dist-newstyle/example" "$pkgdir/usr/bin/example"
+}

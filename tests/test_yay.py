@@ -8,12 +8,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from aur_codex_guard.cli import main
+from aur_codex_guard.codex_review import CodexReviewError
 from aur_codex_guard.yay import (
     YayIntegrationError,
     _write_makepkg_config,
     build_yay_command,
     run_guarded_yay,
     validate_yay_arguments,
+    validate_yay_support,
 )
 
 
@@ -115,6 +117,9 @@ class YayIntegrationTests(unittest.TestCase):
                     "aur_codex_guard.yay.find_real_makepkg",
                     return_value="/usr/bin/makepkg",
                 ),
+                patch("aur_codex_guard.yay.inspect_makepkg_support"),
+                patch("aur_codex_guard.yay.inspect_bsdtar_support"),
+                patch("aur_codex_guard.yay.ensure_codex_canary"),
                 patch("aur_codex_guard.yay._lock_file", return_value=lock_descriptor),
                 patch("aur_codex_guard.yay.subprocess.run", return_value=completed) as run_mock,
                 patch("aur_codex_guard.yay.write_transaction_event") as audit_mock,
@@ -129,6 +134,61 @@ class YayIntegrationTests(unittest.TestCase):
         self.assertIn("XDG_CONFIG_HOME", environment)
         self.assertIn("XDG_CACHE_HOME", environment)
         audit_mock.assert_called_once_with(["-S", "fixture"], 0)
+
+    def test_failed_codex_canary_prevents_yay_from_starting(self) -> None:
+        lock_descriptor = os.open("/dev/null", os.O_RDONLY)
+        with (
+            patch("aur_codex_guard.yay.find_real_yay", return_value="/usr/bin/yay"),
+            patch("aur_codex_guard.yay.validate_yay_support"),
+            patch("aur_codex_guard.yay.hook_executable", return_value="/project/hook"),
+            patch("aur_codex_guard.yay.makepkg_executable", return_value="/project/makepkg"),
+            patch("aur_codex_guard.yay.find_real_makepkg", return_value="/usr/bin/makepkg"),
+            patch("aur_codex_guard.yay.inspect_makepkg_support"),
+            patch("aur_codex_guard.yay.inspect_bsdtar_support"),
+            patch("aur_codex_guard.yay._lock_file", return_value=lock_descriptor),
+            patch(
+                "aur_codex_guard.yay.ensure_codex_canary",
+                side_effect=CodexReviewError("fixture failure"),
+            ),
+            patch("aur_codex_guard.yay.subprocess.run") as run_mock,
+            self.assertRaisesRegex(YayIntegrationError, "compatibility preflight failed"),
+        ):
+            run_guarded_yay(["-S", "fixture"])
+        run_mock.assert_not_called()
+
+    def test_yay_13_minor_updates_use_capability_contract(self) -> None:
+        help_result = subprocess.CompletedProcess(
+            ["yay", "--help"],
+            0,
+            "--editmenu --answeredit --editor --redownloadall --rebuildall --makepkg",
+            "",
+        )
+        combined_result = subprocess.CompletedProcess(
+            ["yay", "--combinedupgrade", "--help"], 0, "", ""
+        )
+        with patch(
+            "aur_codex_guard.yay.subprocess.run",
+            side_effect=[
+                subprocess.CompletedProcess(
+                    ["yay", "--version"], 0, "yay v13.9.2 - libalpm v16.0.1\n", ""
+                ),
+                help_result,
+                combined_result,
+            ],
+        ):
+            validate_yay_support("/usr/bin/yay")
+
+    def test_yay_new_major_fails_closed(self) -> None:
+        with (
+            patch(
+                "aur_codex_guard.yay.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    ["yay", "--version"], 0, "yay v14.0.0 - libalpm v17.0.0\n", ""
+                ),
+            ),
+            self.assertRaisesRegex(YayIntegrationError, "required range"),
+        ):
+            validate_yay_support("/usr/bin/yay")
 
 
 if __name__ == "__main__":

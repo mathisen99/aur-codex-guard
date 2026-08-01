@@ -1,0 +1,23 @@
+pkgname=policy-native-cmake
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for a conventional native CMake build'
+arch=('x86_64')
+url='https://example.invalid/native-cmake'
+license=('MIT')
+makedepends=('cmake' 'ninja')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('1111111111111111111111111111111111111111111111111111111111111111')
+
+build() {
+  cmake -S "$pkgname-$pkgver" -B build -G Ninja -DCMAKE_BUILD_TYPE=None
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build --prefix /usr
+}

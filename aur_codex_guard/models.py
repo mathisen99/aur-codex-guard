@@ -139,6 +139,7 @@ class GateReport:
     reason: str
     deterministic: DeterministicReport
     codex: CodexReport | None
+    human_override: bool = False
 
     @property
     def allowed(self) -> bool:
@@ -150,4 +151,5 @@ class GateReport:
             "reason": self.reason,
             "deterministic": self.deterministic.to_dict(),
             "codex": self.codex.to_dict() if self.codex else None,
+            "human_override": self.human_override,
         }

@@ -32,8 +32,30 @@ class GateTests(unittest.TestCase):
         self.assertTrue(report.allowed)
 
     @patch("aur_codex_guard.gate.review_with_codex")
-    def test_codex_warn_closes_gate(self, review_mock) -> None:
+    def test_complete_codex_warn_requires_human_decision(self, review_mock) -> None:
         review_mock.return_value = codex_report("warn", "medium")
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "warn")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_low_confidence_warn_cannot_be_overridden(self, review_mock) -> None:
+        review_mock.return_value = codex_report("warn", "low")
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_incomplete_warn_cannot_be_overridden(self, review_mock) -> None:
+        response = codex_report("warn", "high")
+        response.coverage_complete = False
+        review_mock.return_value = response
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_warn_with_limitations_cannot_be_overridden(self, review_mock) -> None:
+        response = codex_report("warn", "high")
+        response.limitations = ["Could not inspect a supplied file"]
+        review_mock.return_value = response
         report = review_packages([FIXTURES / "benign"])
         self.assertEqual(report.verdict, "block")
 

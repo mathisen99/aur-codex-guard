@@ -1,0 +1,32 @@
+pkgname=policy-go-modules
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for conventional Go module restoration and smoke tests'
+arch=('x86_64')
+url='https://example.invalid/go-modules'
+license=('MIT')
+makedepends=('go')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('9999999999999999999999999999999999999999999999999999999999999999')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export GOMODCACHE="$srcdir/go-modules"
+  go mod download -modcacherw
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export GOMODCACHE="$srcdir/go-modules"
+  go build -trimpath -o build/example ./cmd/example
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  ./build/example --help >/dev/null
+  go test ./...
+}
+
+package() {
+  install -Dm755 "$pkgname-$pkgver/build/example" "$pkgdir/usr/bin/example"
+}

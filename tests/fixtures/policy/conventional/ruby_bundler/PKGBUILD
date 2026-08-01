@@ -1,0 +1,25 @@
+pkgname=policy-ruby-bundler
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for conventional locked Ruby dependency restoration'
+arch=('any')
+url='https://example.invalid/ruby-bundler'
+license=('MIT')
+makedepends=('ruby-bundler')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('8888888888888888888888888888888888888888888888888888888888888888')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  bundle config set --local path "$srcdir/vendor/bundle"
+  bundle install
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  bundle exec rake test
+}
+
+package() {
+  install -Dm755 "$pkgname-$pkgver/bin/example" "$pkgdir/usr/bin/example"
+}

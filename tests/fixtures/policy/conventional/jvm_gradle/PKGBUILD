@@ -1,0 +1,26 @@
+pkgname=policy-jvm-gradle
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for a conventional JVM dependency and test build'
+arch=('any')
+url='https://example.invalid/jvm-gradle'
+license=('Apache-2.0')
+makedepends=('gradle' 'java-environment')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('5555555555555555555555555555555555555555555555555555555555555555')
+
+build() {
+  cd "$pkgname-$pkgver"
+  export GRADLE_USER_HOME="$srcdir/gradle-home"
+  gradle --no-daemon assemble
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export GRADLE_USER_HOME="$srcdir/gradle-home"
+  gradle --no-daemon test
+}
+
+package() {
+  install -Dm644 "$pkgname-$pkgver/build/libs/example.jar" "$pkgdir/usr/share/java/example.jar"
+}

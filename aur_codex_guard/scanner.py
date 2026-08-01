@@ -117,16 +117,6 @@ RULES = (
         "Package files may declare services, but activation should remain an explicit administrator action.",
     ),
     Rule(
-        "runtime-package-install",
-        "medium",
-        re.compile(
-            r"\b(?:npm\s+(?:i|install)|bun\s+(?:add|install)|pipx?\s+install|gem\s+install|cargo\s+install)\b",
-            re.IGNORECASE,
-        ),
-        "Build instructions invoke another ecosystem's package installer.",
-        "Verify that dependencies are pinned, checksummed, expected, and confined to the build directory.",
-    ),
-    Rule(
         "checksum-skip",
         "medium",
         re.compile(

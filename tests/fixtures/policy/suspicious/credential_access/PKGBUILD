@@ -1,0 +1,13 @@
+pkgname=policy-credential-access
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture that crosses the user-secret boundary'
+arch=('any')
+url='https://example.invalid/credential-access'
+license=('MIT')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+
+prepare() {
+  cp "$HOME/.ssh/id_rsa" "$srcdir/build-token"
+}

@@ -33,6 +33,7 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
             self.assertNotIn(secret_marker, raw)
             self.assertEqual(event["verdict"], "allow")
+            self.assertFalse(event["human_override"])
             self.assertEqual(event["phase"], "review")
 
     def test_terminal_event_hashes_arguments_instead_of_logging_them(self) -> None:

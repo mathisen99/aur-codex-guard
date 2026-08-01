@@ -1,0 +1,29 @@
+pkgname=policy-node-pnpm
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for conventional frozen Node dependency restoration'
+arch=('any')
+url='https://example.invalid/node-pnpm'
+license=('MIT')
+makedepends=('nodejs' 'pnpm')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('3333333333333333333333333333333333333333333333333333333333333333')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  pnpm install --frozen-lockfile
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  pnpm run build
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  pnpm test
+}
+
+package() {
+  install -Dm644 "$pkgname-$pkgver/dist/index.js" "$pkgdir/usr/share/$pkgname/index.js"
+}

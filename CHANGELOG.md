@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 - 2026-08-01
+
+- Replaced brittle exact Codex pinning with minimum-version, CLI-capability, and disabled-feature checks.
+- Added a harmless structured-output canary before yay starts, cached by Codex executable hash and compatibility-contract version.
+- Added `doctor`, JSON diagnostics, live/forced canary modes, and fail-closed preflight reporting.
+- Accepted compatible yay 13.x, makepkg 7.x, and bsdtar 3.x updates while retaining major-version gates and strict invocation checks.
+- Added TTY-aware colored, aligned, and wrapped human reports with plain redirected output and `NO_COLOR` support.
+- Added immediate package/canary progress messages and explicit interactive acceptance for complete, limitation-free Codex warnings; hard or non-interactive cases still fail closed and overrides are audited.
+- Replaced ecosystem-specific dependency warnings with a language-independent policy based on build phase, destination, side effects, and crossed trust boundaries; added representative and intentionally unfamiliar toolchain policy evaluations while retaining hard blocks for concrete dangerous behavior.
+- Replaced alarming user-facing `ALLOW/WARN` labels with `PASS/REVIEW` while retaining the internal fail-closed verdicts.
+- Added compatibility and canary regression tests plus a scheduled latest-Arch compatibility workflow.
+
 ## 0.3.0 - 2026-08-01
 
 - Closed yay's first-value option-precedence bypass and rejected protected `--option=value` forms.

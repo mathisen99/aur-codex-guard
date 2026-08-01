@@ -1,0 +1,29 @@
+pkgname=policy-unfamiliar-toolchain
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for an unfamiliar but conventional build toolchain'
+arch=('any')
+url='https://example.invalid/unfamiliar-toolchain'
+license=('MIT')
+makedepends=('example-forge')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  forge resolve --locked --cache "$srcdir/forge-cache"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  forge compile --output "$srcdir/build"
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  forge verify --artifacts "$srcdir/build"
+}
+
+package() {
+  install -Dm755 "$srcdir/build/example" "$pkgdir/usr/bin/example"
+}

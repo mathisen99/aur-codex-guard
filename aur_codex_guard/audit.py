@@ -97,6 +97,7 @@ def write_audit_event(report: GateReport) -> None:
         "deterministic_rules": sorted({item.rule_id for item in report.deterministic.findings}),
         "codex_verdict": report.codex.verdict if report.codex else None,
         "codex_confidence": report.codex.confidence if report.codex else None,
+        "human_override": report.human_override,
     }
     _append_event(event)
 

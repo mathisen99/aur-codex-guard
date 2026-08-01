@@ -1,0 +1,32 @@
+pkgname=policy-dotnet-locked
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Policy fixture for conventional locked .NET restoration and tests'
+arch=('x86_64')
+url='https://example.invalid/dotnet-locked'
+license=('MIT')
+makedepends=('dotnet-sdk')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('6666666666666666666666666666666666666666666666666666666666666666')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export NUGET_PACKAGES="$srcdir/nuget-packages"
+  dotnet restore --locked-mode
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export NUGET_PACKAGES="$srcdir/nuget-packages"
+  dotnet build --no-restore --configuration Release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export NUGET_PACKAGES="$srcdir/nuget-packages"
+  dotnet test --no-build --configuration Release
+}
+
+package() {
+  install -Dm644 "$pkgname-$pkgver/bin/Release/example.dll" "$pkgdir/usr/lib/example/example.dll"
+}
