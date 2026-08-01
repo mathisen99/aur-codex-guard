@@ -6,7 +6,9 @@ import sys
 from collections.abc import Sequence
 
 from . import __version__
+from .audit import AuditError, write_audit_event
 from .gate import review_packages
+from .receipts import ReceiptError, write_receipts
 from .reporting import print_human, print_json
 from .yay import YayIntegrationError, run_guarded_yay
 
@@ -105,6 +107,18 @@ def hook_main(argv: Sequence[str] | None = None) -> int:
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return EXIT_ERROR
+    if report.allowed:
+        try:
+            write_receipts(report.deterministic)
+            write_audit_event(report)
+        except (OSError, AuditError, ReceiptError) as error:
+            print(f"error: fail-closed finalization error: {error}", file=sys.stderr)
+            return EXIT_ERROR
+    else:
+        try:
+            write_audit_event(report)
+        except AuditError as error:
+            print(f"warning: could not record blocked review: {error}", file=sys.stderr)
     print_human(report)
     return EXIT_ALLOW if report.allowed else EXIT_BLOCK
 

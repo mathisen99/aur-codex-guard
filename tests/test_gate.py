@@ -18,7 +18,8 @@ def codex_report(verdict: str = "allow", confidence: str = "high") -> CodexRepor
         confidence=confidence,  # type: ignore[arg-type]
         summary="fixture response",
         findings=[],
-        reviewed_files=["benign/PKGBUILD"],
+        reviewed_files=["benign/PKGBUILD", "benign/hello.sh"],
+        coverage_complete=True,
         limitations=[],
     )
 
@@ -39,6 +40,28 @@ class GateTests(unittest.TestCase):
     @patch("aur_codex_guard.gate.review_with_codex")
     def test_low_confidence_allow_closes_gate(self, review_mock) -> None:
         review_mock.return_value = codex_report("allow", "low")
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_medium_confidence_allow_closes_gate(self, review_mock) -> None:
+        review_mock.return_value = codex_report("allow", "medium")
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_incomplete_file_manifest_closes_gate(self, review_mock) -> None:
+        response = codex_report()
+        response.reviewed_files = ["benign/PKGBUILD"]
+        review_mock.return_value = response
+        report = review_packages([FIXTURES / "benign"])
+        self.assertEqual(report.verdict, "block")
+
+    @patch("aur_codex_guard.gate.review_with_codex")
+    def test_limitations_close_gate(self, review_mock) -> None:
+        response = codex_report()
+        response.limitations = ["Could not inspect hello.sh"]
+        review_mock.return_value = response
         report = review_packages([FIXTURES / "benign"])
         self.assertEqual(report.verdict, "block")
 

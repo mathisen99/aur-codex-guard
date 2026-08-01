@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 
+from .codex_review import REQUIRED_MODEL, REQUIRED_REASONING_EFFORT
 from .models import GateReport
 
 
@@ -27,17 +28,18 @@ def print_human(report: GateReport) -> None:
 
     if report.codex:
         print(
-            f"\nCodex: {report.codex.verdict.upper()} ({report.codex.confidence} confidence)",
+            f"\nCodex {REQUIRED_MODEL} ({REQUIRED_REASONING_EFFORT} reasoning): "
+            f"{report.codex.verdict.upper()} ({report.codex.confidence} confidence)",
             file=sys.stderr,
         )
         print(f"  {report.codex.summary}", file=sys.stderr)
-        for finding in report.codex.findings:
-            severity = str(finding.get("severity", "unknown")).upper()
-            path = str(finding.get("file", "unknown"))
-            line = finding.get("line")
+        for codex_finding in report.codex.findings:
+            severity = str(codex_finding.get("severity", "unknown")).upper()
+            path = str(codex_finding.get("file", "unknown"))
+            line = codex_finding.get("line")
             if line:
                 path += f":{line}"
-            title = finding.get("title", "Finding")
+            title = codex_finding.get("title", "Finding")
             print(f"  [{severity}] {path}: {title}", file=sys.stderr)
         for limitation in report.codex.limitations:
             print(f"  Limitation: {limitation}", file=sys.stderr)

@@ -45,6 +45,9 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "coverage_complete": {
+      "type": "boolean"
+    },
     "limitations": {
       "type": "array",
       "items": { "type": "string" }
@@ -56,6 +59,7 @@
     "summary",
     "findings",
     "reviewed_files",
+    "coverage_complete",
     "limitations"
   ],
   "additionalProperties": false

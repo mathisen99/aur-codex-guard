@@ -1,0 +1,4 @@
+#!/usr/bin/env python3
+from aur_codex_guard.makepkg import makepkg_main
+
+raise SystemExit(makepkg_main())

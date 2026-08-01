@@ -54,10 +54,33 @@ def review_packages(
             deterministic,
             codex,
         )
-    if codex.confidence == "low":
+    if codex.confidence != "high":
         return GateReport(
             "block",
-            "Codex returned allow with low confidence, so the gate remains closed.",
+            "Codex did not return allow with high confidence, so the gate remains closed.",
+            deterministic,
+            codex,
+        )
+    if not codex.coverage_complete:
+        return GateReport(
+            "block",
+            "Codex did not attest to complete file coverage.",
+            deterministic,
+            codex,
+        )
+    if set(codex.reviewed_files) != deterministic.expected_reviewed_files or len(
+        codex.reviewed_files
+    ) != len(deterministic.expected_reviewed_files):
+        return GateReport(
+            "block",
+            "Codex's reviewed-file manifest did not exactly match the scanner input.",
+            deterministic,
+            codex,
+        )
+    if codex.limitations:
+        return GateReport(
+            "block",
+            "Codex reported review limitations, so the gate remains closed.",
             deterministic,
             codex,
         )

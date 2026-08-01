@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Literal
+from typing import Literal, cast
 
 Severity = Literal["info", "low", "medium", "high", "critical"]
 Verdict = Literal["allow", "warn", "block"]
@@ -32,8 +32,11 @@ class Finding:
 @dataclass(frozen=True)
 class ReviewedFile:
     package: str
+    package_root: str
     relative_path: str
     content: str
+    sha256: str
+    mode: int
 
     @property
     def display_path(self) -> str:
@@ -47,6 +50,10 @@ class DeterministicReport:
     skipped_files: list[str] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     diffs: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def expected_reviewed_files(self) -> set[str]:
+        return {item.display_path for item in self.reviewed_files}
 
     @property
     def highest_severity(self) -> Severity:
@@ -70,6 +77,7 @@ class DeterministicReport:
         return {
             "package_roots": self.package_roots,
             "reviewed_files": [item.display_path for item in self.reviewed_files],
+            "file_hashes": {item.display_path: item.sha256 for item in self.reviewed_files},
             "skipped_files": self.skipped_files,
             "highest_severity": self.highest_severity,
             "verdict": self.deterministic_verdict,
@@ -84,6 +92,7 @@ class CodexReport:
     summary: str
     findings: list[dict[str, object]]
     reviewed_files: list[str]
+    coverage_complete: bool
     limitations: list[str]
 
     @classmethod
@@ -94,13 +103,30 @@ class CodexReport:
             raise ValueError("Codex response has an invalid verdict")
         if confidence not in {"low", "medium", "high"}:
             raise ValueError("Codex response has invalid confidence")
+        coverage_complete = value.get("coverage_complete")
+        if not isinstance(coverage_complete, bool):
+            raise TypeError("Codex response has invalid coverage_complete")
+        findings = value.get("findings")
+        reviewed_files = value.get("reviewed_files")
+        limitations = value.get("limitations")
+        if not isinstance(findings, list) or not all(isinstance(item, dict) for item in findings):
+            raise TypeError("Codex response has invalid findings")
+        if not isinstance(reviewed_files, list) or not all(
+            isinstance(item, str) for item in reviewed_files
+        ):
+            raise TypeError("Codex response has invalid reviewed_files")
+        if not isinstance(limitations, list) or not all(
+            isinstance(item, str) for item in limitations
+        ):
+            raise TypeError("Codex response has invalid limitations")
         return cls(
             verdict=verdict,  # type: ignore[arg-type]
             confidence=confidence,  # type: ignore[arg-type]
             summary=str(value.get("summary", "")),
-            findings=list(value.get("findings", [])),  # type: ignore[arg-type]
-            reviewed_files=[str(item) for item in value.get("reviewed_files", [])],  # type: ignore[union-attr]
-            limitations=[str(item) for item in value.get("limitations", [])],  # type: ignore[union-attr]
+            findings=cast(list[dict[str, object]], findings),
+            reviewed_files=cast(list[str], reviewed_files),
+            coverage_complete=coverage_complete,
+            limitations=cast(list[str], limitations),
         )
 
     def to_dict(self) -> dict[str, object]:

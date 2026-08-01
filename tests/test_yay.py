@@ -12,11 +12,12 @@ class YayIntegrationTests(unittest.TestCase):
         command = build_yay_command(
             "/usr/bin/yay",
             "/project/hook",
+            "/project/makepkg",
             ["-S", "example", "--noeditmenu", "--editor", "/bin/true"],
         )
         self.assertEqual(command[:2], ["/usr/bin/yay", "-S"])
         self.assertEqual(
-            command[-9:],
+            command[-12:],
             [
                 "--editmenu",
                 "--answeredit",
@@ -27,6 +28,9 @@ class YayIntegrationTests(unittest.TestCase):
                 "",
                 "--redownloadall",
                 "--rebuildall",
+                "--combinedupgrade",
+                "--makepkg",
+                "/project/makepkg",
             ],
         )
 

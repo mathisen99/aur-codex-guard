@@ -1,7 +1,9 @@
 # Security policy
 
-Please do not include live credentials, private package contents, or executable malware in an issue.
+This project is pre-release security tooling. An `allow` verdict is advisory and never proves that an AUR package is safe.
 
-For a suspected bypass, provide the smallest inert reproducer that demonstrates the scanner behavior. Until a finding is understood, do not use the guarded `yay` path as the sole control for that package.
+Report suspected bypasses through a private GitHub security advisory when that feature is available. If it is unavailable, open a minimal issue asking the maintainer to establish a private contact channel without disclosing exploit details. Do not publish a working exploit while remediation is in progress.
 
-The project is alpha software and makes no claim that an `allow` verdict proves a package safe.
+Reports should include the affected version, the exact guarded command, expected and actual behavior, and the smallest inert reproducer possible. Do not attach live credentials, private package contents, or executable malware.
+
+Security-relevant scope includes fail-open behavior, bypass of the forced editor/makepkg path, receipt verification errors, unsafe archive acceptance, secret disclosure, and misleading guarantees. Model misclassification alone is expected residual risk unless it demonstrates a reproducible implementation bypass.
