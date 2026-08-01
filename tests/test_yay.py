@@ -76,7 +76,10 @@ class YayIntegrationTests(unittest.TestCase):
     def test_private_makepkg_config_uses_fresh_destinations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             session = Path(temporary)
-            config, pkgdest = _write_makepkg_config(session)
+            system_config = session / "system-makepkg.conf"
+            system_config.write_text("# test system config\n", encoding="utf-8")
+            with patch("aur_codex_guard.yay.SYSTEM_MAKEPKG_CONFIG", system_config):
+                config, pkgdest = _write_makepkg_config(session)
             content = config.read_text(encoding="utf-8")
             self.assertIn(f"PKGDEST={pkgdest}", content)
             self.assertIn(f"SRCDEST={session / 'sources'}", content)
@@ -96,17 +99,27 @@ class YayIntegrationTests(unittest.TestCase):
     def test_guarded_session_wires_private_config_and_terminal_audit(self) -> None:
         lock_descriptor = os.open("/dev/null", os.O_RDONLY)
         completed = subprocess.CompletedProcess(["yay"], 0)
-        with (
-            patch("aur_codex_guard.yay.find_real_yay", return_value="/usr/bin/yay"),
-            patch("aur_codex_guard.yay.validate_yay_support"),
-            patch("aur_codex_guard.yay.hook_executable", return_value="/project/hook"),
-            patch("aur_codex_guard.yay.makepkg_executable", return_value="/project/makepkg"),
-            patch("aur_codex_guard.yay.find_real_makepkg", return_value="/usr/bin/makepkg"),
-            patch("aur_codex_guard.yay._lock_file", return_value=lock_descriptor),
-            patch("aur_codex_guard.yay.subprocess.run", return_value=completed) as run_mock,
-            patch("aur_codex_guard.yay.write_transaction_event") as audit_mock,
-        ):
-            self.assertEqual(run_guarded_yay(["-S", "fixture"]), 0)
+        with tempfile.TemporaryDirectory() as temporary:
+            system_config = Path(temporary) / "system-makepkg.conf"
+            system_config.write_text("# test system config\n", encoding="utf-8")
+            with (
+                patch("aur_codex_guard.yay.SYSTEM_MAKEPKG_CONFIG", system_config),
+                patch("aur_codex_guard.yay.find_real_yay", return_value="/usr/bin/yay"),
+                patch("aur_codex_guard.yay.validate_yay_support"),
+                patch("aur_codex_guard.yay.hook_executable", return_value="/project/hook"),
+                patch(
+                    "aur_codex_guard.yay.makepkg_executable",
+                    return_value="/project/makepkg",
+                ),
+                patch(
+                    "aur_codex_guard.yay.find_real_makepkg",
+                    return_value="/usr/bin/makepkg",
+                ),
+                patch("aur_codex_guard.yay._lock_file", return_value=lock_descriptor),
+                patch("aur_codex_guard.yay.subprocess.run", return_value=completed) as run_mock,
+                patch("aur_codex_guard.yay.write_transaction_event") as audit_mock,
+            ):
+                self.assertEqual(run_guarded_yay(["-S", "fixture"]), 0)
         command = run_mock.call_args.args[0]
         environment = run_mock.call_args.kwargs["env"]
         config = environment["AUR_CODEX_GUARD_MAKEPKG_CONFIG"]

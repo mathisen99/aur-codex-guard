@@ -21,6 +21,7 @@ from .receipts import (
 )
 
 TESTED_YAY_VERSION = "13.0.1"
+SYSTEM_MAKEPKG_CONFIG = Path("/etc/makepkg.conf")
 
 PROTECTED_YAY_OPTIONS = {
     "--answerclean",
@@ -241,7 +242,7 @@ def validate_yay_arguments(arguments: list[str]) -> None:
 
 
 def _write_makepkg_config(session_path: Path) -> tuple[Path, Path]:
-    system_config = Path("/etc/makepkg.conf")
+    system_config = SYSTEM_MAKEPKG_CONFIG
     try:
         metadata = system_config.stat()
     except OSError as error:
