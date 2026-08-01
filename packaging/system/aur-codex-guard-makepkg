@@ -1,0 +1,14 @@
+#!/bin/sh
+# Managed by AUR Codex Guard
+set -eu
+
+guard_bindir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+guard_libdir=$(CDPATH='' cd -- "$guard_bindir/../lib/aur-codex-guard" && pwd -P)
+PYTHONPATH=$guard_libdir
+PYTHONNOUSERSITE=1
+PYTHONDONTWRITEBYTECODE=1
+export PYTHONPATH PYTHONNOUSERSITE PYTHONDONTWRITEBYTECODE
+unset PYTHONHOME PYTHONINSPECT PYTHONSTARTUP
+
+exec /usr/bin/python3 -sP -c \
+  'from aur_codex_guard.makepkg import makepkg_main; raise SystemExit(makepkg_main())' "$@"

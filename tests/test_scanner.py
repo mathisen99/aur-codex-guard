@@ -34,6 +34,44 @@ class ScannerTests(unittest.TestCase):
             {finding.rule_id for finding in report.findings},
         )
 
+    def test_zero_width_character_in_executable_metadata_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text(
+                "pkgname=fixture\nprepare() {\n  c\u200burl example.invalid\n}\n",
+                encoding="utf-8",
+            )
+            report = deterministic_scan([root])
+        self.assertEqual(report.deterministic_verdict, "block")
+        self.assertIn("zero-width-character", {finding.rule_id for finding in report.findings})
+
+    def test_localized_desktop_zero_width_text_is_not_a_hard_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text("pkgname=fixture\n", encoding="utf-8")
+            (root / "fixture.desktop").write_text(
+                "[Desktop Entry]\nName[lo]=\u0e95\u0ebb\u0ea7\u200b\u0ea2\u0ec8\u0eb2\u0e87\n",
+                encoding="utf-8",
+            )
+            report = deterministic_scan([root])
+        self.assertEqual(report.deterministic_verdict, "allow")
+        finding = next(item for item in report.findings if item.rule_id == "zero-width-character")
+        self.assertEqual(finding.severity, "info")
+
+    def test_dependency_name_and_pkgdir_staging_are_not_credential_or_persistence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "PKGBUILD").write_text(
+                "optdepends=('gnome-keyring: password storage')\n"
+                'package() { rm -r "$pkgdir"/etc/cron.daily/; }\n',
+                encoding="utf-8",
+            )
+            report = deterministic_scan([root])
+        rules = {finding.rule_id for finding in report.findings}
+        self.assertNotIn("credential-access", rules)
+        self.assertNotIn("persistence-change", rules)
+        self.assertEqual(report.deterministic_verdict, "allow")
+
     def test_symlink_is_not_followed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -8,16 +8,17 @@ This is a risk-reduction layer, not a sandbox and not a proof of safety.
 
 ## Boundary and sequence
 
-1. The wrapper accepts only explicit sync/install transactions, rejects conflicting plumbing options, and verifies the supported yay, makepkg, bsdtar, and Codex interfaces.
-2. Before yay starts, a changed Codex executable must satisfy the local capability contract and pass a harmless live structured-output canary. Successful canaries are cached by executable hash, guard version, and contract version.
-3. The wrapper gives yay isolated config/cache directories and forces clean checkout, `--combinedupgrade`, re-download, rebuild, an empty makepkg flag override, a private makepkg configuration, and the AUR editor hook.
-4. `yay` clones or refreshes AUR metadata before invoking the hook.
-5. The hook reads all regular metadata files without sourcing `PKGBUILD` and runs deterministic checks.
-6. If static policy permits model review, Codex reviews each package independently from a fresh temporary directory with no shell, unified-exec, multi-agent, app, hook, or web-search tool surface.
-7. A high-confidence, complete, finding-free, limitation-free `allow` opens automatically. A complete, limitation-free `warn` with at least medium confidence requires an explicit interactive human decision; acceptance is recorded without erasing the original Codex verdict. All other non-allows remain blocked.
-8. An allowed or explicitly accepted review creates an authenticated receipt covering the reviewed root identity plus each path, hash, and mode.
-9. Every `makepkg` invocation must match the yay 13.x argument allowlist and validates the receipt through no-follow directory descriptors. Final and cached/no-build outputs are confined to a fresh private package destination, validated again, and inspected before returning success.
-10. Only then may `yay` install the AUR packages and any deferred repository upgrades.
+1. When system-installed, `/usr/local/bin/yay` classifies the invocation. Installing sync transactions and plain `yay` updates enter the guard; read-only and unrelated operations replace the dispatcher process with `/usr/bin/yay`; ambiguous or unsupported build/install shapes are refused.
+2. The wrapper accepts only explicit sync/install transactions, rejects conflicting plumbing options, and verifies the supported yay, makepkg, bsdtar, and Codex interfaces.
+3. Before yay starts, a changed Codex executable must satisfy the local capability contract and pass a harmless live structured-output canary. Successful canaries are cached by executable hash, guard version, and contract version.
+4. The wrapper gives yay isolated config/cache directories and forces clean checkout, `--combinedupgrade`, re-download, rebuild, an empty makepkg flag override, a private makepkg configuration, and the AUR editor hook.
+5. `yay` clones or refreshes AUR metadata before invoking the hook.
+6. The hook reads all regular metadata files without sourcing `PKGBUILD` and runs deterministic checks.
+7. If static policy permits model review, Codex reviews each package independently from a fresh temporary directory with no shell, unified-exec, multi-agent, app, hook, or web-search tool surface.
+8. A high-confidence, complete, finding-free, limitation-free `allow` opens automatically. A complete, limitation-free `warn` with at least medium confidence requires an explicit interactive human decision; acceptance is recorded without erasing the original Codex verdict. All other non-allows remain blocked.
+9. An allowed or explicitly accepted review creates an authenticated receipt covering the reviewed root identity plus each path, hash, and mode.
+10. Every `makepkg` invocation must match the yay 13.x argument allowlist and validates the receipt through no-follow directory descriptors. Final and cached/no-build outputs are confined to a fresh private package destination, validated again, and inspected before returning success.
+11. Only then may `yay` install the AUR packages and any deferred repository upgrades.
 
 `--combinedupgrade` is essential for mixed `-Syu` transactions: without it, `yay` can perform the repository upgrade before preparing and reviewing AUR targets.
 
@@ -68,7 +69,8 @@ Compromise of a trusted component is out of scope.
 - The transaction secret is inherited by yay and can potentially be read by malicious same-user code through operating-system process introspection. It protects pre-build integrity; it is not a post-code-execution boundary.
 - Repository-only transactions do not have AUR metadata and do not invoke this gate.
 - Pacman sync databases, AUR caches, downloaded sources, build directories, artifacts, or build dependencies can change even when a later phase fails.
-- The wrapper does not protect direct calls to `yay`, `makepkg`, other helpers, or `pacman -U`.
+- The installed `/usr/local/bin/yay` dispatcher does not protect explicit calls to `/usr/bin/yay`, direct `makepkg`, other helpers, `pacman -U`, or programs whose `PATH` omits `/usr/local/bin`.
+- The dispatcher intentionally refuses target-only interactive selection, `yay -B`, `yay -U`, and download-only AUR transaction shapes rather than claiming to guard flows the integration has not verified.
 - Concurrent unguarded package operations are outside the transaction lock.
 - Safe automatic rollback of Pacman state is not attempted.
 - A terminal audit failure can be reported only after yay exits and cannot undo a transaction that already succeeded.

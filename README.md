@@ -2,12 +2,12 @@
 
 AUR Codex Guard is a conservative, fail-closed security gate for [`yay`](https://github.com/Jguer/yay). It reviews AUR build metadata after `yay` downloads it and before `makepkg` runs, then verifies that the reviewed files remain unchanged through the build.
 
-This is currently a development checkout. **Nothing here installs itself, changes `yay` configuration, creates aliases, or modifies system files.**
+This is currently pre-release software. Nothing installs itself or changes `yay` configuration. The explicit system installer described below adds root-owned files beneath `/usr/local`; it never replaces Arch's `/usr/bin/yay`.
 
 ## What it enforces
 
 - Forces yay to clean the checkout, then reads every regular file outside `.git`; pre-existing `src`, `pkg`, `__pycache__`, and unknown extensions are not silently skipped.
-- Rejects symlinks, special files, binary/non-UTF-8 data, invisible Unicode, unreadable data, and oversized review inputs.
+- Rejects symlinks, special files, binary/non-UTF-8 data, dangerous hidden Unicode in executable metadata, unreadable data, and oversized review inputs; linguistically valid zero-width characters in localized desktop display text are contextual information rather than an automatic block.
 - Applies deterministic rules for network-to-shell execution, encoded payloads, reverse shells, privilege escalation, credential access, persistence, destructive commands, install-time downloads, and other high-risk behavior.
 - Reviews one AUR package at a time with `codex exec`, explicitly pinned to `gpt-5.6-sol` and `high` reasoning.
 - Applies one language-independent policy based on build phase, destination, side effects, and crossed trust boundaries. Build-local dependency resolution, compilation, testing, and staging are baseline behavior regardless of tool name; secrets, host mutation, privilege, persistence, integrity bypass, and unexplained remote execution are escalated.
@@ -59,7 +59,7 @@ The guarantee is deliberately narrower than “the machine is unchanged”:
 - Pacman sync databases and `yay` metadata/cache may be refreshed before a review fails.
 - A repository-only transaction has no AUR metadata and therefore does not invoke Codex.
 - A failure after an approved build starts can leave downloaded sources, build directories, package artifacts, or build dependencies. A post-build inspection failure prevents the target AUR archive from being handed back as successful, but it cannot undo earlier build-side effects safely.
-- Direct `yay`, `makepkg`, another AUR helper, or `pacman -U` bypasses this wrapper. The wrapper itself rejects `yay -U`, search/query/clean/download-only modes, alternate makepkg recipes/configuration, and integrity-bypass flags.
+- Explicit `/usr/bin/yay`, `makepkg`, another AUR helper, or `pacman -U` bypasses the installed dispatcher. The guarded path rejects `yay -B`, `yay -U`, ambiguous interactive target selection, download-only AUR syncs, alternate makepkg recipes/configuration, and integrity-bypass flags.
 
 The project does not attempt risky rollback of Pacman databases or installed dependencies.
 
@@ -93,6 +93,39 @@ The real integration path is shown below, but it **can install packages through 
 ./aur-codex-guard yay -S package-name
 ```
 
+## System installation
+
+After testing the checkout, install it explicitly:
+
+```bash
+sudo ./scripts/install-system.sh
+rehash
+command -v yay
+aur-codex-guard doctor --live
+```
+
+`command -v yay` must print `/usr/local/bin/yay`. The installer places the guard, its internal hook and makepkg wrapper, and a small `yay` dispatcher under `/usr/local/bin`; the Python code lives under `/usr/local/lib/aur-codex-guard`. `/usr/bin/yay` remains the real, package-managed executable and continues receiving normal Arch updates.
+
+After installation:
+
+- plain `yay` is treated as guarded `yay -Syu`;
+- `yay -S package` and other installing sync transactions are guarded;
+- queries, searches, removals, and metadata operations such as `yay -Qua`, `yay -Ss`, and `yay -R` pass directly to `/usr/bin/yay`;
+- repository-only sync transactions run through the wrapper but have no AUR editor hook, so no package review occurs;
+- the ambiguous `yay package-name` interactive selection form is refused; use `yay -S package-name`;
+- local build/archive operations `yay -B` and `yay -U`, plus download-only AUR syncs, are refused because they can execute or install content outside the guarded transaction shape.
+
+A changed Codex executable or review-policy contract can cause the compatibility canary to run before a guarded sync transaction even if that transaction ultimately contains only repository packages. This is a compatibility check over the bundled harmless fixture, not a package review. Normally it is cached.
+
+The shim relies on `/usr/local/bin` preceding `/usr/bin` in `PATH`, which is the case on this development system. Programs that invoke `/usr/bin/yay` explicitly bypass it. Verify command resolution after every installation rather than assuming it.
+
+To remove only installer-managed files:
+
+```bash
+sudo ./scripts/uninstall-system.sh
+rehash
+```
+
 ## Exit codes
 
 | Code | Meaning |
@@ -119,4 +152,4 @@ Compatibility is based on narrow version families plus runtime capabilities:
 
 ## Project status
 
-Version 0.4.0 is pre-release software. Unit tests and CI cover option-bypass regressions, compatibility ranges and capabilities, canary caching, language-independent trust-boundary policy cases, terminal progress/color/plain-text behavior, explicit review acceptance and rejection, a fake yay/makepkg transaction path, the fail-closed model policy, timeout handling, receipts, and real archive fixtures. A real AUR installation has intentionally not been completed from this checkout yet.
+Version 0.5.0 is pre-release software. Unit tests and CI cover the staged system installer, plain-yay dispatch and bypass classification, option-bypass regressions, compatibility ranges and capabilities, canary caching, language-independent trust-boundary policy cases, terminal behavior, explicit review acceptance and rejection, a fake yay/makepkg transaction path, the fail-closed model policy, timeout handling, receipts, and real archive fixtures.

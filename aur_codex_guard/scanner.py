@@ -100,7 +100,7 @@ RULES = (
         "credential-access",
         "high",
         re.compile(
-            r"(?:\.ssh/|\.aws/|\.config/gcloud|Login Data|Cookies(?:-journal)?|keyrings?|credentials?|discord|slack)",
+            r"(?:\.ssh/|\.aws/|\.config/(?:gcloud|discord|slack)(?:/|$))",
             re.IGNORECASE,
         ),
         "Script references credential, browser-session, or messaging-client data.",
@@ -110,7 +110,7 @@ RULES = (
         "persistence-change",
         "high",
         re.compile(
-            r"(?:\bsystemctl\s+(?:enable|start)|\bcrontab\b|\.config/autostart|/etc/(?:cron|systemd))",
+            r"(?:\bsystemctl\s+(?:enable|start)|\bcrontab\b|\.config/autostart)",
             re.IGNORECASE,
         ),
         "Script attempts to create persistence or activate a service directly.",
@@ -136,7 +136,9 @@ RULES = (
     ),
 )
 
-BIDI_OR_INVISIBLE = re.compile("[\u200b\u200c\u200d\u202a-\u202e\u2066-\u2069\ufeff]")
+DANGEROUS_UNICODE_CONTROL = re.compile("[\u202a-\u202e\u2066-\u2069\ufeff]")
+ZERO_WIDTH_CHARACTER = re.compile("[\u200b\u200c\u200d]")
+LOCALIZED_DESKTOP_ENTRY = re.compile(r"^[A-Za-z][A-Za-z0-9-]*\[[^]]+\]=")
 
 
 def package_roots_from_inputs(inputs: list[str | os.PathLike[str]]) -> list[Path]:
@@ -235,8 +237,12 @@ def _git_diff(root: Path) -> str:
 
 def _scan_content(display_path: str, content: str) -> list[Finding]:
     findings: list[Finding] = []
-    for match in BIDI_OR_INVISIBLE.finditer(content):
+    dangerous_lines: set[int] = set()
+    for match in DANGEROUS_UNICODE_CONTROL.finditer(content):
         line = content.count("\n", 0, match.start()) + 1
+        if line in dangerous_lines:
+            continue
+        dangerous_lines.add(line)
         findings.append(
             Finding(
                 "invisible-control-character",
@@ -249,11 +255,45 @@ def _scan_content(display_path: str, content: str) -> list[Finding]:
             )
         )
 
+    zero_width_lines: set[int] = set()
+    for match in ZERO_WIDTH_CHARACTER.finditer(content):
+        line = content.count("\n", 0, match.start()) + 1
+        if line in zero_width_lines:
+            continue
+        zero_width_lines.add(line)
+        line_text = content.splitlines()[line - 1]
+        localized_desktop_text = display_path.endswith(".desktop") and bool(
+            LOCALIZED_DESKTOP_ENTRY.match(line_text)
+        )
+        findings.append(
+            Finding(
+                "zero-width-character",
+                "info" if localized_desktop_text else "high",
+                display_path,
+                line,
+                (
+                    "Zero-width Unicode occurs in localized desktop display text."
+                    if localized_desktop_text
+                    else "Zero-width Unicode occurs in executable or non-localized metadata."
+                ),
+                repr(match.group(0)),
+                (
+                    "Confirm the character is linguistically intentional."
+                    if localized_desktop_text
+                    else "Remove the hidden character and review the line as potentially deceptive."
+                ),
+            )
+        )
+
     for rule in RULES:
         if not rule.applies(display_path):
             continue
+        seen_lines: set[int] = set()
         for match in rule.pattern.finditer(content):
             line = content.count("\n", 0, match.start()) + 1
+            if line in seen_lines:
+                continue
+            seen_lines.add(line)
             evidence = match.group(0).replace("\n", " ")[:240]
             findings.append(
                 Finding(

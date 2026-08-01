@@ -8,6 +8,7 @@ from dataclasses import replace
 
 from . import __version__
 from .audit import AuditError, write_audit_event
+from .dispatch import dispatch_yay
 from .doctor import print_doctor, run_doctor
 from .gate import review_packages
 from .receipts import ReceiptError, write_receipts
@@ -113,6 +114,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments = arguments[1:]
         try:
             return run_guarded_yay(arguments)
+        except YayIntegrationError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return EXIT_ERROR
+    if raw_arguments[:1] == ["dispatch-yay"]:
+        arguments = raw_arguments[1:]
+        if arguments[:1] == ["--"]:
+            arguments = arguments[1:]
+        try:
+            return dispatch_yay(arguments)
         except YayIntegrationError as error:
             print(f"error: {error}", file=sys.stderr)
             return EXIT_ERROR

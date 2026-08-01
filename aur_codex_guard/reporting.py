@@ -240,7 +240,11 @@ def print_human(
     )
     _field(output, "Gate", report.reason, color=use_color)
 
-    findings = report.deterministic.findings
+    findings = [
+        finding
+        for finding in report.deterministic.findings
+        if finding.severity != "info" or report.verdict != "allow"
+    ]
     if findings:
         print(f"\n    {_styled('Deterministic findings', BOLD, enabled=use_color)}", file=output)
         for finding in findings:

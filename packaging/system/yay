@@ -1,0 +1,6 @@
+#!/bin/sh
+# Managed by AUR Codex Guard
+set -eu
+
+guard_bindir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+exec "$guard_bindir/aur-codex-guard" dispatch-yay -- "$@"

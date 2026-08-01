@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - 2026-08-01
+
+- Added an explicit root-owned `/usr/local` installer that leaves `/usr/bin/yay` package-managed and places a transparent `yay` dispatcher earlier in normal system `PATH` resolution.
+- Guarded plain `yay`, `yay -S`, and `yay -Syu`; passed read-only and unrelated operations to the real yay; and refused ambiguous interactive selection, local build/archive, and download-only execution shapes.
+- Added staged install, collision refusal, uninstall, dispatcher, command-resolution, and bypass-classification tests.
+- Replaced false-positive keyword checks with contextual credential paths and host actions, distinguished `$pkgdir` staging from live-system mutation, and treated zero-width characters in localized desktop display text as informational while retaining hard blocks in executable metadata.
+- Completed a live five-package pending-update review with high-confidence passes and aborted before installation.
+
 ## 0.4.0 - 2026-08-01
 
 - Replaced brittle exact Codex pinning with minimum-version, CLI-capability, and disabled-feature checks.

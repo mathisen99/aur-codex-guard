@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from aur_codex_guard.models import CodexReport, GateReport
+from aur_codex_guard.models import CodexReport, Finding, GateReport
 from aur_codex_guard.reporting import (
     print_canary_start,
     print_human,
@@ -43,6 +43,22 @@ def allowed_report() -> GateReport:
 
 
 class HumanReportingTests(unittest.TestCase):
+    def test_pass_report_hides_informational_scanner_notes(self) -> None:
+        report = allowed_report()
+        report.deterministic.findings.append(
+            Finding(
+                "localized-text",
+                "info",
+                "fixture/example.desktop",
+                4,
+                "Localized display text contains a zero-width character.",
+            )
+        )
+        output = io.StringIO()
+        print_human(report, stream=output, color=False)
+        self.assertNotIn("Deterministic findings", output.getvalue())
+        self.assertNotIn("localized-text", output.getvalue())
+
     def test_terminal_report_has_structured_color_output(self) -> None:
         output = TtyBuffer()
         with patch.dict(os.environ, {"TERM": "xterm-256color"}, clear=True):
