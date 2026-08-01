@@ -9,6 +9,7 @@
 - Completed a real guarded FVS2 update from metadata download through Codex review, build, archive inspection, and successful Pacman installation.
 - Simplified the README, added project artwork and a real terminal screenshot, made the package version single-source, and tightened CI and maintainer guidance.
 - Fixed the checkout-only makepkg launcher so it imports reliably when yay invokes it from an external build directory.
+- Ran rolling compatibility checks as an unprivileged user so yay's root warning cannot mask its version output in the Arch container.
 
 ## 0.5.0 - 2026-08-01
 

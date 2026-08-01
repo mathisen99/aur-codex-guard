@@ -32,6 +32,9 @@ jobs:
           pacman -U --noconfirm /tmp/yay/yay-*.pkg.tar.zst
       - name: Check rolling compatibility without model credentials
         run: |
-          ./aur-codex-guard doctor --json
-          python scripts/run_policy_evals.py
-          python -m unittest discover -s tests -v
+          runuser -u builder -- sh -c '
+            cd "$1"
+            ./aur-codex-guard doctor --json
+            python scripts/run_policy_evals.py
+            python -m unittest discover -s tests -v
+          ' sh "$GITHUB_WORKSPACE"
