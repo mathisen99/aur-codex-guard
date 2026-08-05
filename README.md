@@ -8,7 +8,7 @@
 A fail-closed security review for AUR packages installed with [`yay`](https://github.com/Jguer/yay). It checks downloaded build metadata with deterministic rules and Codex before `makepkg` runs, then verifies the reviewed files and built package archive before installation.
 
 > [!WARNING]
-> This is pre-release security tooling. It reduces risk; it cannot prove that a package or its upstream source is harmless.
+> This is defense-in-depth security tooling. It reduces risk; it cannot prove that a package or its upstream source is harmless.
 
 ## What happens when you run `yay`
 
@@ -69,6 +69,18 @@ To remove the installed shim and guard files:
 sudo ./scripts/uninstall-system.sh
 rehash
 ```
+
+## Conservative behavior and common edge cases
+
+A `BLOCK` means the package crossed a safety rule or could not be reviewed completely. It does not, by itself, mean that malware was detected. In particular:
+
+- Binary files committed directly to an AUR package checkout are blocked, including harmless-looking PNG icons, fonts, archives, and executable files. They cannot be reviewed as UTF-8 build metadata. This also applies to packages whose names end in `-bin`; the suffix does not relax review because their `PKGBUILD` and install scripts still execute locally. Inspect such a file independently before deciding what to do.
+- Non-UTF-8 files, symlinks, special files, unreadable files, and files that change during scanning are blocked because complete, stable review cannot be established.
+- Review input is limited to 512 KiB per file and 2 MiB per package checkout. Packages that commit unusually large generated files or assets may therefore be blocked even when those files are legitimate.
+- High-risk text patterns such as network responses piped into a shell, dynamic shell evaluation, privilege escalation, credential access, or hidden Unicode controls are intentionally conservative. A legitimate use can still produce a deterministic block.
+- Codex errors, timeouts, authentication or connectivity failures, low-confidence results, incomplete coverage, and malformed responses leave the gate closed. A review warning can be accepted only from an interactive terminal.
+
+These fail-closed cases favor an explainable refusal over silently continuing with incomplete evidence. Review the reported rule, file, and line, then verify the package independently; do not interpret a block as proof of either safety or maliciousness.
 
 ## Important limits
 
