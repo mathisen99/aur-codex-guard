@@ -321,6 +321,43 @@ def _lock_file() -> int:
     return descriptor
 
 
+def _session_parent_directory() -> Path:
+    configured_cache = os.environ.get("XDG_CACHE_HOME")
+    cache_home = Path(configured_cache) if configured_cache else Path.home() / ".cache"
+    if not cache_home.is_absolute():
+        raise YayIntegrationError("XDG_CACHE_HOME must be an absolute path")
+    try:
+        cache_home.mkdir(mode=0o700, parents=True, exist_ok=True)
+        cache_home = cache_home.resolve(strict=True)
+        cache_metadata = cache_home.stat()
+    except OSError as error:
+        raise YayIntegrationError(f"Cannot access user cache directory: {error}") from error
+    if (
+        not stat.S_ISDIR(cache_metadata.st_mode)
+        or cache_metadata.st_uid != os.getuid()
+        or stat.S_IMODE(cache_metadata.st_mode) & 0o022
+    ):
+        raise YayIntegrationError(f"Unsafe user cache directory: {cache_home}")
+
+    session_parent = cache_home / "aur-codex-guard"
+    try:
+        session_parent.mkdir(mode=0o700, exist_ok=True)
+        if session_parent.is_symlink():
+            raise YayIntegrationError(f"Unsafe session parent directory: {session_parent}")
+        parent_metadata = session_parent.stat()
+    except YayIntegrationError:
+        raise
+    except OSError as error:
+        raise YayIntegrationError(f"Cannot access session parent directory: {error}") from error
+    if (
+        not stat.S_ISDIR(parent_metadata.st_mode)
+        or parent_metadata.st_uid != os.getuid()
+        or stat.S_IMODE(parent_metadata.st_mode) & 0o077
+    ):
+        raise YayIntegrationError(f"Unsafe session parent directory: {session_parent}")
+    return session_parent
+
+
 def run_guarded_yay(arguments: list[str], *, yay_binary: str | None = None) -> int:
     if os.environ.get(ACTIVE_ENV) == "1":
         raise YayIntegrationError("Refusing recursive guarded-yay invocation")
@@ -343,7 +380,8 @@ def run_guarded_yay(arguments: list[str], *, yay_binary: str | None = None) -> i
             )
         except CodexReviewError as error:
             raise YayIntegrationError(f"Codex compatibility preflight failed: {error}") from error
-        with tempfile.TemporaryDirectory(prefix="aur-codex-guard-session-") as session:
+        session_parent = _session_parent_directory()
+        with tempfile.TemporaryDirectory(prefix="session-", dir=session_parent) as session:
             session_path = Path(session)
             os.chmod(session_path, 0o700)
             receipt_dir = session_path / "receipts"
