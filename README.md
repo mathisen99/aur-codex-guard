@@ -5,10 +5,21 @@
 [![CI](https://github.com/mathisen99/aur-codex-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/mathisen99/aur-codex-guard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A fail-closed security review for AUR packages installed with [`yay`](https://github.com/Jguer/yay). It checks downloaded build metadata with deterministic rules and Codex before `makepkg` runs, then verifies the reviewed files and built package archive before installation.
+A public, fail-closed review layer for AUR packages installed with [`yay`](https://github.com/Jguer/yay). It checks downloaded build metadata with deterministic rules and Codex before `makepkg` runs, then verifies the reviewed files and built package archive before installation.
 
 > [!WARNING]
 > This is defense-in-depth security tooling. It reduces risk; it cannot prove that a package or its upstream source is harmless.
+
+## Why this exists
+
+The AUR is useful because anyone can share a package recipe, but that also means its contents are not equivalent to packages in Arch's official repositories. The [ArchWiki AUR documentation](https://wiki.archlinux.org/title/Arch_User_Repository) describes AUR packages as unofficial, user-produced content that has not been thoroughly vetted. It tells users to inspect the `PKGBUILD`, install scripts, and every other file before building.
+
+That warning is based on real incidents:
+
+- In July 2025, the [Arch AUR mailing list reported](https://lists.archlinux.org/archives/list/aur-general%40lists.archlinux.org/thread/7EZTJXLIAQLARQNTMEW2HBWZYE626IFJ/) that `librewolf-fix-bin`, `firefox-patch-bin`, and `zen-browser-patched-bin` downloaded a remote-access trojan.
+- In June 2026, Arch announced an [active AUR malicious-packages incident](https://archlinux.org/news/active-aur-malicious-packages-incident/) involving a high volume of malicious package adoptions and updates. Arch again asked users to review every `PKGBUILD` and install-script change. A [July 30 follow-up report](https://lists.archlinux.org/archives/list/aur-general%40lists.archlinux.org/message/BU6RECTA5DTJBL7Q4NQI5T3AKIN2FWSF/) described hundreds of suspected malicious updates carrying small ELF executables and listed several manually verified examples.
+
+AUR Codex Guard adds one more review step to the normal `yay` workflow. It automates checks that are easy to skip during a routine update and stops the transaction when it cannot complete them. It does not make the AUR a trusted repository or replace the user's judgment.
 
 ## What happens when you run `yay`
 

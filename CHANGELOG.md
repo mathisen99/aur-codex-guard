@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Store private guarded-yay sessions beneath the user's XDG cache instead of `/tmp`, avoiding tmpfs quota exhaustion while preserving ownership, permission, isolation, and cleanup checks.
+- Update the public documentation with the project's AUR security motivation, links to the 2025 and 2026 malware incidents, and current project status.
 
 ## 0.5.1 - 2026-08-01
 
@@ -47,7 +48,7 @@
 - Hardened receipt traversal against intermediate symlink substitution.
 - Added terminal transaction audit events, bounded log rotation, integration-style fakes, timeout coverage, real archive tests, mypy, and wheel builds.
 
-## 0.2.0 - Unreleased
+## 0.2.0
 
 - Pin Codex review to `gpt-5.6-sol` with high reasoning and strict configuration.
 - Require high-confidence, complete, exact-manifest, limitation-free model approval.

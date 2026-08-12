@@ -6,6 +6,10 @@ Reduce the chance that malicious or unexpectedly dangerous AUR build metadata re
 
 This is a risk-reduction layer, not a sandbox and not a proof of safety.
 
+The trust boundary comes from the AUR itself. The [ArchWiki AUR documentation](https://wiki.archlinux.org/title/Arch_User_Repository) states that AUR packages are unofficial, user-produced content that has not been thoroughly vetted. Arch has also documented concrete attacks: three malicious browser packages fetched a remote-access trojan in [July 2025](https://lists.archlinux.org/archives/list/aur-general%40lists.archlinux.org/thread/7EZTJXLIAQLARQNTMEW2HBWZYE626IFJ/), followed by a high volume of malicious package adoptions and updates in [June 2026](https://archlinux.org/news/active-aur-malicious-packages-incident/). A [July 30 aur-general report](https://lists.archlinux.org/archives/list/aur-general%40lists.archlinux.org/message/BU6RECTA5DTJBL7Q4NQI5T3AKIN2FWSF/) described hundreds of suspected malicious updates carrying small ELF executables and listed several manually verified examples.
+
+The guard adds an automated review before AUR build metadata executes. It supplements the manual review Arch expects from AUR users; it does not transfer trust to Codex or turn AUR packages into official packages.
+
 ## Boundary and sequence
 
 1. When system-installed, `/usr/local/bin/yay` classifies the invocation. Installing sync transactions and plain `yay` updates enter the guard; read-only and unrelated operations replace the dispatcher process with `/usr/bin/yay`; ambiguous or unsupported build/install shapes are refused.
@@ -63,7 +67,7 @@ Compromise of a trusted component is out of scope.
 - Valid checksums prove artifact identity, not safety. `SKIP` may also be legitimate for pinned VCS sources and is therefore escalated to Codex rather than always blocked.
 - A subtle payload may evade deterministic rules and model reasoning.
 - Policy is based on behavior, phase, destination, and crossed trust boundaries rather than recognizing a finite set of languages or commands. Build-local dependency resolution, compilation, test execution, and `$pkgdir` staging are baseline behavior even for an unfamiliar toolchain. Secret access, host mutation, privilege, persistence, integrity bypass, unexplained remote execution, or other purpose-inconsistent side effects remain in scope.
-- This semantic calibration reduces alert fatigue but can also hide malicious behavior inside otherwise ordinary build steps. The representative ecosystem fixtures are regression examples, not proof that any ecosystem—or any package using it—is safe.
+- This semantic calibration reduces alert fatigue but can also hide malicious behavior inside otherwise ordinary build steps. The representative ecosystem fixtures are regression examples, not proof that any ecosystem or package using it is safe.
 - Human warning acceptance is a deliberate risk decision, not a security finding dismissal. A user can approve dangerous behavior, so the audit retains both the Codex warning and the override flag.
 - Receipt authentication protects transaction integrity but is not a security boundary after attacker-controlled code is already executing as the same user.
 - The transaction secret is inherited by yay and can potentially be read by malicious same-user code through operating-system process introspection. It protects pre-build integrity; it is not a post-code-execution boundary.

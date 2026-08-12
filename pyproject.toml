@@ -5,14 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "aur-codex-guard"
 dynamic = ["version"]
-description = "Fail-closed pre-build security gate for yay and AUR packages"
+description = "Defense-in-depth review gate for AUR packages installed with yay"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Tommy Mathisen" }]
 keywords = ["arch-linux", "aur", "pkgbuild", "security", "codex"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "License :: OSI Approved :: MIT License",
   "Operating System :: POSIX :: Linux",

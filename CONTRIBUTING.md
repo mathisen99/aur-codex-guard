@@ -1,5 +1,7 @@
 # Contributing
 
+This is a public project. Use GitHub issues and pull requests for normal bugs, documentation, and code changes. Report suspected security bypasses privately as described in [SECURITY.md](SECURITY.md).
+
 Keep changes fail-closed and avoid executing fixture content. Security fixtures must be inert text that demonstrates a pattern without contacting a network, changing the host, or containing live malware.
 
 Before submitting a change, run:
