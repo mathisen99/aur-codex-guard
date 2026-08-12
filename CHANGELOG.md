@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Store private guarded-yay sessions beneath the user's XDG cache instead of `/tmp`, avoiding tmpfs quota exhaustion while preserving ownership, permission, isolation, and cleanup checks.
+
 ## 0.5.1 - 2026-08-01
 
 - Fixed built-package inspection falsely treating the conventional `lrwxrwxrwx` display mode of symlinks as a world-writable file.

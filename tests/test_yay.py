@@ -11,6 +11,7 @@ from aur_codex_guard.cli import main
 from aur_codex_guard.codex_review import CodexReviewError
 from aur_codex_guard.yay import (
     YayIntegrationError,
+    _session_parent_directory,
     _write_makepkg_config,
     build_yay_command,
     run_guarded_yay,
@@ -88,6 +89,21 @@ class YayIntegrationTests(unittest.TestCase):
             self.assertIn(f"BUILDDIR={session / 'build'}", content)
             self.assertEqual(config.stat().st_mode & 0o777, 0o600)
 
+    def test_private_sessions_use_user_cache_instead_of_system_temporary_space(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cache_home = Path(temporary) / "cache"
+            with patch.dict(os.environ, {"XDG_CACHE_HOME": str(cache_home)}):
+                session_parent = _session_parent_directory()
+            self.assertEqual(session_parent, cache_home / "aur-codex-guard")
+            self.assertEqual(session_parent.stat().st_mode & 0o777, 0o700)
+
+    def test_relative_xdg_cache_home_is_rejected(self) -> None:
+        with (
+            patch.dict(os.environ, {"XDG_CACHE_HOME": "relative/cache"}),
+            self.assertRaisesRegex(YayIntegrationError, "must be an absolute path"),
+        ):
+            _session_parent_directory()
+
     @patch("aur_codex_guard.cli.run_guarded_yay")
     def test_cli_forwards_yay_options_without_separator(self, run_mock) -> None:
         run_mock.return_value = 0
@@ -105,6 +121,10 @@ class YayIntegrationTests(unittest.TestCase):
             system_config = Path(temporary) / "system-makepkg.conf"
             system_config.write_text("# test system config\n", encoding="utf-8")
             with (
+                patch.dict(
+                    os.environ,
+                    {"XDG_CACHE_HOME": str(Path(temporary) / "cache")},
+                ),
                 patch("aur_codex_guard.yay.SYSTEM_MAKEPKG_CONFIG", system_config),
                 patch("aur_codex_guard.yay.find_real_yay", return_value="/usr/bin/yay"),
                 patch("aur_codex_guard.yay.validate_yay_support"),
